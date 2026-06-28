@@ -1,6 +1,6 @@
 # CleanZip
 
-CleanZip is a lightweight native macOS 26 archive utility focused on clean ZIP creation, common archive extraction, archive previews, and split archive creation.
+CleanZip is a lightweight native macOS 26 archive utility focused on clean archive creation, common archive extraction, archive previews, split archive creation, and a single Finder right-click action.
 
 ## Features
 
@@ -10,12 +10,32 @@ CleanZip is a lightweight native macOS 26 archive utility focused on clean ZIP c
 - Extraction support through system tools and bundled `7zz`.
 - Split archive creation for ZIP and 7Z.
 - macOS 26 Liquid Glass app icon built from vector SVG layers and compiled to `Assets.car` on GitHub Actions.
+- App-wide localization for the main window, toolbar, progress HUD, notifications, errors, Finder service menu, and archive document metadata.
+
+## Supported Languages
+
+CleanZip follows the user's macOS language preferences. Current localizations:
+
+- English
+- Simplified Chinese
+- Traditional Chinese
+- Japanese
+- Korean
+- French
+- German
+- Spanish
+- Italian
+- Brazilian Portuguese
+- Russian
+
+If a preferred language is not available, CleanZip falls back to English.
 
 ## Repository Layout
 
 - `work/CleanZipBuild/src/main.swift`: main AppKit/SwiftUI app.
 - `work/CleanZipBuild/src/service.swift`: Finder service helper.
 - `work/CleanZipBuild/src/build.sh`: local Swift build script.
+- `work/CleanZipBuild/src/Resources/*.lproj`: localized app, service, and Info.plist resources.
 - `work/CleanZipBuild/src/generate_filled_icon.py`: vector icon generator and `Assets.car` compiler when Xcode `actool` is available.
 - `.github/workflows/cleanzip-liquid-glass-icon.yml`: macOS 26 GitHub Actions build that compiles the dynamic icon stack.
 
@@ -37,7 +57,7 @@ The workflow uploads `CleanZip.app`, `CleanZipService.service`, the vector `AppI
 
 ## Install
 
-Download `CleanZip.pkg` from the latest GitHub Release and open it. The installer places:
+Download `CleanZip.pkg` from the [latest GitHub Release](https://github.com/lyc280705/CleanZip/releases/latest) and open it. The installer places:
 
 - `CleanZip.app` in `/Applications`
 - `CleanZipService.service` in `/Library/Services`
@@ -45,6 +65,8 @@ Download `CleanZip.pkg` from the latest GitHub Release and open it. The installe
 The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID.
 
 Manual archive users can download `CleanZip.zip`, unzip it, move `CleanZip.app` to `/Applications`, and move `CleanZipService.service` to `/Library/Services`.
+
+The current localized release is [CleanZip 2.6.29](https://github.com/lyc280705/CleanZip/releases/tag/v2.6.29).
 
 ## Package
 
