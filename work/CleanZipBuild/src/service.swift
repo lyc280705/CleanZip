@@ -1,6 +1,22 @@
 import AppKit
 @preconcurrency import UserNotifications
 
+enum L10n {
+    static func tr(_ key: String, _ args: CVarArg...) -> String {
+        let format = Bundle.main.localizedString(forKey: key, value: key, table: nil)
+        guard !args.isEmpty else { return format }
+        return String(format: format, locale: Locale.current, arguments: args)
+    }
+
+    static func itemCount(_ count: Int) -> String {
+        tr(count == 1 ? "count.item.one" : "count.item.other", String(count))
+    }
+
+    static func archiveCount(_ count: Int) -> String {
+        tr(count == 1 ? "count.archive.one" : "count.archive.other", String(count))
+    }
+}
+
 struct ProcessResult {
     let status: Int32
     let stdout: String
@@ -30,7 +46,7 @@ enum ArchiveError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingTool(let tool): return "找不到工具：\(tool)"
+        case .missingTool(let tool): return L10n.tr("error.missingTool", tool)
         case .failed(let message): return message
         }
     }
@@ -64,10 +80,10 @@ final class ArchiveEngine {
     }
 
     func compress(urls: [URL], progressHandler: ProgressHandler? = nil) throws -> URL {
-        guard !urls.isEmpty else { throw ArchiveError.failed("没有选择要压缩的项目。") }
+        guard !urls.isEmpty else { throw ArchiveError.failed(L10n.tr("error.noItemsToCompress")) }
         let parent = urls[0].deletingLastPathComponent()
         guard urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == parent.standardizedFileURL }) else {
-            throw ArchiveError.failed("请一次只压缩同一个文件夹里的项目。")
+            throw ArchiveError.failed(L10n.tr("error.sameParentRequired"))
         }
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: "zip")
@@ -196,7 +212,7 @@ final class ServiceProgressHUD {
     private var percentField: NSTextField?
     private var progressIndicator: NSProgressIndicator?
     private var scheduledShow: DispatchWorkItem?
-    private var title = "正在处理"
+    private var title = L10n.tr("operation.processing")
     private var detail = ""
     private var fraction = 0.0
     private var finished = false
@@ -242,7 +258,7 @@ final class ServiceProgressHUD {
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 372, height: 116), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.title = "CleanZip 进度"
+        panel.title = L10n.tr("window.progressTitle")
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.transient, .fullScreenAuxiliary]
@@ -357,14 +373,14 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
     func cleanZip(_ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         let urls = pasteboardURLs(pasteboard)
         guard !urls.isEmpty else {
-            error.pointee = "没有收到 Finder 选中的文件或文件夹。" as NSString
+            error.pointee = L10n.tr("error.noFinderItems") as NSString
             NSApp.terminate(nil)
             return
         }
 
         let shouldExtract = urls.allSatisfy { ArchiveEngine.shared.isArchive($0) }
-        let title = shouldExtract ? "正在解压" : "正在压缩"
-        let detail = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) 个项目"
+        let title = shouldExtract ? L10n.tr("operation.extracting") : L10n.tr("operation.compressing")
+        let detail = urls.count == 1 ? urls[0].lastPathComponent : (shouldExtract ? L10n.archiveCount(urls.count) : L10n.itemCount(urls.count))
         hud.begin(title: title, detail: detail)
 
         DispatchQueue.global(qos: .userInitiated).async {
@@ -380,16 +396,16 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
                             }
                         })
                     }
-                    let message = outputs.count == 1 ? "已解压到：\(outputs[0].lastPathComponent)" : "已解压 \(outputs.count) 个压缩包"
+                    let message = outputs.count == 1 ? L10n.tr("notification.extractedTo", outputs[0].lastPathComponent) : L10n.tr("notification.extractedArchives", L10n.archiveCount(outputs.count))
                     DispatchQueue.main.async { self.finish(message: message) }
                 } else {
                     let output = try ArchiveEngine.shared.compress(urls: urls) { fraction in
                         DispatchQueue.main.async { self.hud.update(fraction: fraction) }
                     }
-                    DispatchQueue.main.async { self.finish(message: "已生成：\(output.lastPathComponent)") }
+                    DispatchQueue.main.async { self.finish(message: L10n.tr("notification.created", output.lastPathComponent)) }
                 }
             } catch {
-                DispatchQueue.main.async { self.finish(title: "CleanZip 操作失败", message: error.localizedDescription) }
+                DispatchQueue.main.async { self.finish(title: L10n.tr("notification.operationFailedTitle"), message: error.localizedDescription) }
             }
         }
     }

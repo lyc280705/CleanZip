@@ -11,6 +11,7 @@ on:
       - "work/CleanZipBuild/src/service.swift"
       - "work/CleanZipBuild/src/build.sh"
       - "work/CleanZipBuild/src/package.sh"
+      - "work/CleanZipBuild/src/Resources/**"
       - "work/CleanZipBuild/src/generate_filled_icon.py"
       - "work/CleanZipBuild/src/install_icon_assets.sh"
       - "work/CleanZipBuild/assets/CleanZipIcon.original.icns"

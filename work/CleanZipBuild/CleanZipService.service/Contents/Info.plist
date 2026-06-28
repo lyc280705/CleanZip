@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh_CN</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>CleanZip</string>
 	<key>CFBundleExecutable</key>
@@ -16,6 +16,20 @@
 	<string>local.codex.cleanzip.service</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
+		<string>ja</string>
+		<string>ko</string>
+		<string>fr</string>
+		<string>de</string>
+		<string>es</string>
+		<string>it</string>
+		<string>pt-BR</string>
+		<string>ru</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>CleanZipService</string>
 	<key>CFBundlePackageType</key>
@@ -23,7 +37,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>2.6</string>
 	<key>CFBundleVersion</key>
-	<string>28</string>
+	<string>29</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
@@ -40,7 +54,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>CleanZip 压缩或解压</string>
+				<string>CleanZip Compress or Extract</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>cleanZip</string>

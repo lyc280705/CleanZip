@@ -4,6 +4,26 @@ import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import UserNotifications
 
+enum L10n {
+    static func tr(_ key: String, _ args: CVarArg...) -> String {
+        let format = Bundle.main.localizedString(forKey: key, value: key, table: nil)
+        guard !args.isEmpty else { return format }
+        return String(format: format, locale: Locale.current, arguments: args)
+    }
+
+    static func itemCount(_ count: Int) -> String {
+        tr(count == 1 ? "count.item.one" : "count.item.other", String(count))
+    }
+
+    static func archiveCount(_ count: Int) -> String {
+        tr(count == 1 ? "count.archive.one" : "count.archive.other", String(count))
+    }
+
+    static func fileCount(_ count: Int) -> String {
+        tr(count == 1 ? "count.file.one" : "count.file.other", String(count))
+    }
+}
+
 struct ArchiveEntry: Identifiable {
     let id = UUID()
     let path: String
@@ -33,7 +53,7 @@ struct SelectedItem: Identifiable {
     var name: String { url.lastPathComponent }
     var location: String { url.deletingLastPathComponent().path }
     var isDirectory: Bool { (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false }
-    var typeName: String { isDirectory ? "文件夹" : (url.pathExtension.isEmpty ? "文件" : url.pathExtension.uppercased()) }
+    var typeName: String { isDirectory ? L10n.tr("item.type.folder") : (url.pathExtension.isEmpty ? L10n.tr("item.type.file") : url.pathExtension.uppercased()) }
     var sizeText: String {
         if isDirectory { return "--" }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
@@ -50,16 +70,17 @@ enum ArchiveFormat: String, CaseIterable, Identifiable {
 
 struct SplitPreset: Identifiable, Hashable {
     let id: String
-    let title: String
+    let titleKey: String
     let spec: String?
+    var title: String { L10n.tr(titleKey) }
     static let all: [SplitPreset] = [
-        .init(id: "none", title: "不分卷", spec: nil),
-        .init(id: "10m", title: "10 MB", spec: "10m"),
-        .init(id: "50m", title: "50 MB", spec: "50m"),
-        .init(id: "100m", title: "100 MB", spec: "100m"),
-        .init(id: "500m", title: "500 MB", spec: "500m"),
-        .init(id: "1g", title: "1 GB", spec: "1g"),
-        .init(id: "custom", title: "自定义", spec: nil)
+        .init(id: "none", titleKey: "split.none", spec: nil),
+        .init(id: "10m", titleKey: "split.10mb", spec: "10m"),
+        .init(id: "50m", titleKey: "split.50mb", spec: "50m"),
+        .init(id: "100m", titleKey: "split.100mb", spec: "100m"),
+        .init(id: "500m", titleKey: "split.500mb", spec: "500m"),
+        .init(id: "1g", titleKey: "split.1gb", spec: "1g"),
+        .init(id: "custom", titleKey: "split.custom", spec: nil)
     ]
 }
 
@@ -91,7 +112,7 @@ enum ArchiveError: Error, LocalizedError {
     case failed(String)
     var errorDescription: String? {
         switch self {
-        case .missingTool(let tool): return "找不到工具：\(tool)"
+        case .missingTool(let tool): return L10n.tr("error.missingTool", tool)
         case .failed(let message): return message
         }
     }
@@ -138,10 +159,10 @@ final class ArchiveEngine {
     }
 
     func compress(urls: [URL], format: ArchiveFormat, splitSpec: String?, progressHandler: ProgressHandler? = nil) throws -> URL {
-        guard !urls.isEmpty else { throw ArchiveError.failed("没有选择要压缩的项目。") }
+        guard !urls.isEmpty else { throw ArchiveError.failed(L10n.tr("error.noItemsToCompress")) }
         let parent = urls[0].deletingLastPathComponent()
         guard urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == parent.standardizedFileURL }) else {
-            throw ArchiveError.failed("请一次只压缩同一个文件夹里的项目。")
+            throw ArchiveError.failed(L10n.tr("error.sameParentRequired"))
         }
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: format.fileExtension, splitSpec: splitSpec)
@@ -330,7 +351,7 @@ final class AppState: ObservableObject {
     @Published var archiveURL: URL?
     @Published var entries: [ArchiveEntry] = []
     @Published var searchText = ""
-    @Published var status = "拖入压缩包预览，或拖入文件/文件夹压缩。"
+    @Published var status = L10n.tr("status.empty")
     @Published var isBusy = false
     @Published var operationProgress: OperationProgress?
     @Published var showingCompressSheet = false
@@ -356,7 +377,7 @@ final class AppState: ObservableObject {
             selectedURLs = uniqued(urls)
             selectedItemIDs = []
             operationProgress = nil
-            status = "已选择 \(selectedURLs.count) 个项目。"
+            status = L10n.tr("status.selectedItems", L10n.itemCount(selectedURLs.count))
         }
         notifyStateDidChange()
     }
@@ -368,7 +389,7 @@ final class AppState: ObservableObject {
         selectedURLs = uniqued(selectedURLs + urls)
         selectedItemIDs = selectedItemIDs.filter { id in selectedURLs.contains { $0.path == id } }
         operationProgress = nil
-        status = "已选择 \(selectedURLs.count) 个项目。"
+        status = L10n.tr("status.selectedItems", L10n.itemCount(selectedURLs.count))
         notifyStateDidChange()
     }
 
@@ -376,7 +397,7 @@ final class AppState: ObservableObject {
         guard !selectedItemIDs.isEmpty else { return }
         selectedURLs.removeAll { selectedItemIDs.contains($0.path) }
         selectedItemIDs.removeAll()
-        status = selectedURLs.isEmpty ? "拖入压缩包预览，或拖入文件/文件夹压缩。" : "已选择 \(selectedURLs.count) 个项目。"
+        status = selectedURLs.isEmpty ? L10n.tr("status.empty") : L10n.tr("status.selectedItems", L10n.itemCount(selectedURLs.count))
         notifyStateDidChange()
     }
 
@@ -384,26 +405,26 @@ final class AppState: ObservableObject {
         selectedURLs.removeAll()
         selectedItemIDs.removeAll()
         operationProgress = nil
-        status = "拖入压缩包预览，或拖入文件/文件夹压缩。"
+        status = L10n.tr("status.empty")
         notifyStateDidChange()
     }
 
     func previewArchive(_ url: URL) {
         isBusy = true
-        status = "正在读取：\(url.lastPathComponent)"
+        status = L10n.tr("status.reading", url.lastPathComponent)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let list = try ArchiveEngine.shared.listArchive(url)
                 DispatchQueue.main.async {
                     self.entries = list
-                    self.status = "预览完成：\(self.totalFiles) 个文件，\(Self.formatBytes(self.totalBytes))"
+                    self.status = L10n.tr("status.previewComplete", L10n.fileCount(self.totalFiles), Self.formatBytes(self.totalBytes))
                     self.isBusy = false
                     self.notifyStateDidChange()
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.entries = []
-                    self.status = "预览失败：\(error.localizedDescription)"
+                    self.status = L10n.tr("status.previewFailed", error.localizedDescription)
                     self.isBusy = false
                     self.notifyStateDidChange()
                 }
@@ -417,7 +438,7 @@ final class AppState: ObservableObject {
         guard !urls.isEmpty else { return }
         let split = resolvedSplitSpec()
         let selectedFormat = format
-        beginOperation(title: "正在压缩", detail: "\(urls.count) 个项目")
+        beginOperation(title: L10n.tr("operation.compressing"), detail: L10n.itemCount(urls.count))
         showingCompressSheet = false
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -427,16 +448,16 @@ final class AppState: ObservableObject {
                     }
                 }
                 DispatchQueue.main.async {
-                    self.status = "已生成：\(output.lastPathComponent)"
+                    self.status = L10n.tr("status.created", output.lastPathComponent)
                     self.isBusy = false
                     self.operationProgress = nil
                     self.notifyStateDidChange()
-                    Self.notify(title: "CleanZip", message: "已生成：\(output.lastPathComponent)")
+                    Self.notify(title: "CleanZip", message: L10n.tr("notification.created", output.lastPathComponent))
                     NSWorkspace.shared.activateFileViewerSelecting([output])
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.status = "压缩失败：\(error.localizedDescription)"
+                    self.status = L10n.tr("status.compressFailed", error.localizedDescription)
                     self.isBusy = false
                     self.operationProgress = nil
                     self.notifyStateDidChange()
@@ -447,7 +468,7 @@ final class AppState: ObservableObject {
 
     func extractCurrentArchive() {
         guard let archiveURL else { return }
-        beginOperation(title: "正在解压", detail: archiveURL.lastPathComponent)
+        beginOperation(title: L10n.tr("operation.extracting"), detail: archiveURL.lastPathComponent)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let output = try ArchiveEngine.shared.extract(archive: archiveURL) { fraction in
@@ -456,16 +477,16 @@ final class AppState: ObservableObject {
                     }
                 }
                 DispatchQueue.main.async {
-                    self.status = "已解压到：\(output.lastPathComponent)"
+                    self.status = L10n.tr("status.extractedTo", output.lastPathComponent)
                     self.isBusy = false
                     self.operationProgress = nil
                     self.notifyStateDidChange()
-                    Self.notify(title: "CleanZip", message: "已解压到：\(output.lastPathComponent)")
+                    Self.notify(title: "CleanZip", message: L10n.tr("notification.extractedTo", output.lastPathComponent))
                     NSWorkspace.shared.activateFileViewerSelecting([output])
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.status = "解压失败：\(error.localizedDescription)"
+                    self.status = L10n.tr("status.extractFailed", error.localizedDescription)
                     self.isBusy = false
                     self.operationProgress = nil
                     self.notifyStateDidChange()
@@ -477,17 +498,17 @@ final class AppState: ObservableObject {
     func testCurrentArchive() {
         guard let archiveURL else { return }
         isBusy = true
-        status = "正在测试压缩包..."
+        status = L10n.tr("status.testing")
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try ArchiveEngine.shared.testArchive(archiveURL)
                 DispatchQueue.main.async {
-                    self.status = "压缩包完整性正常。"
+                    self.status = L10n.tr("status.testPassed")
                     self.isBusy = false
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.status = "完整性测试失败：\(error.localizedDescription)"
+                    self.status = L10n.tr("status.testFailed", error.localizedDescription)
                     self.isBusy = false
                 }
             }
@@ -559,7 +580,7 @@ final class AppState: ObservableObject {
     func beginOperation(title: String, detail: String) {
         isBusy = true
         operationProgress = OperationProgress(title: title, detail: detail, fraction: 0)
-        status = "\(title)：0%"
+        status = L10n.tr("status.progress", title, "0")
         notifyStateDidChange()
     }
 
@@ -568,13 +589,13 @@ final class AppState: ObservableObject {
         let previous = operationProgress?.fraction ?? -1
         guard clamped >= 1 || abs(clamped - previous) >= 0.005 else { return }
         if operationProgress == nil {
-            operationProgress = OperationProgress(title: "正在处理", detail: "", fraction: clamped)
+            operationProgress = OperationProgress(title: L10n.tr("operation.processing"), detail: "", fraction: clamped)
         } else {
             operationProgress?.fraction = clamped
         }
-        let title = operationProgress?.title ?? "正在处理"
+        let title = operationProgress?.title ?? L10n.tr("operation.processing")
         let percent = Int((clamped * 100).rounded())
-        status = "\(title)：\(percent)%"
+        status = L10n.tr("status.progress", title, String(percent))
         notifyStateDidChange()
     }
 
@@ -631,7 +652,7 @@ final class ServiceProgressHUD {
     private var percentField: NSTextField?
     private var progressIndicator: NSProgressIndicator?
     private var scheduledShow: DispatchWorkItem?
-    private var title = "正在处理"
+    private var title = L10n.tr("operation.processing")
     private var detail = ""
     private var fraction = 0.0
     private var finished = false
@@ -686,7 +707,7 @@ final class ServiceProgressHUD {
             backing: .buffered,
             defer: false
         )
-        panel.title = "CleanZip 进度"
+        panel.title = L10n.tr("window.progressTitle")
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.transient, .fullScreenAuxiliary]
@@ -949,9 +970,9 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         table.autosaveName = "local.codex.cleanzip.archiveEntriesTable"
         table.autosaveTableColumns = true
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("name", "名称", 380, 180, 1200),
-            ("size", "大小", 140, 96, 280),
-            ("modified", "修改时间", 240, 190, 2000)
+            ("name", L10n.tr("column.name"), 380, 180, 1200),
+            ("size", L10n.tr("column.size"), 140, 96, 280),
+            ("modified", L10n.tr("column.modified"), 240, 190, 2000)
         ]
         for spec in columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.0))
@@ -1180,10 +1201,10 @@ struct SelectedItemsTable: NSViewRepresentable {
         table.autosaveTableColumns = true
 
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("selectedName", "名称", 260, 180, 900),
-            ("selectedType", "类型", 90, 70, 160),
-            ("selectedSize", "大小", 120, 90, 220),
-            ("selectedLocation", "位置", 360, 220, 2000)
+            ("selectedName", L10n.tr("column.name"), 260, 180, 900),
+            ("selectedType", L10n.tr("column.type"), 90, 70, 160),
+            ("selectedSize", L10n.tr("column.size"), 120, 90, 220),
+            ("selectedLocation", L10n.tr("column.location"), 360, 220, 2000)
         ]
         for spec in columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.0))
@@ -1256,13 +1277,13 @@ struct ContentView: View {
             selectedItemsView
         } else {
             ContentUnavailableView {
-                Label("拖入压缩包预览或解压", systemImage: "shippingbox")
+                Label(L10n.tr("empty.title"), systemImage: "shippingbox")
             } description: {
-                Text("拖入文件和文件夹即可压缩；Finder 右键可一键压缩或解压。")
+                Text(L10n.tr("empty.description"))
             } actions: {
                 HStack {
-                    Button("选择压缩包") { state.openArchivePanel() }
-                    Button("选择项目") { state.openItemsPanel() }
+                    Button(L10n.tr("button.chooseArchive")) { state.openArchivePanel() }
+                    Button(L10n.tr("button.chooseItems")) { state.openItemsPanel() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1274,7 +1295,7 @@ struct ContentView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(archive.lastPathComponent).font(.headline).lineLimit(1)
-                    Text("\(state.totalFiles) 个文件 · \(AppState.formatBytes(state.totalBytes))").foregroundStyle(.secondary)
+                    Text(L10n.tr("archive.summary", L10n.fileCount(state.totalFiles), AppState.formatBytes(state.totalBytes))).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -1290,8 +1311,8 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("已选择 \(state.selectedURLs.count) 个项目").font(.headline)
-                    Text("列表中的项目会一起压缩到源文件同目录。").foregroundStyle(.secondary)
+                    Text(L10n.tr("selected.title", L10n.itemCount(state.selectedURLs.count))).font(.headline)
+                    Text(L10n.tr("selected.description")).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -1347,28 +1368,28 @@ struct CompressSheet: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("压缩设置").font(.title2.weight(.semibold))
+            Text(L10n.tr("settings.title")).font(.title2.weight(.semibold))
             Form {
-                Picker("格式", selection: $state.format) {
+                Picker(L10n.tr("settings.format"), selection: $state.format) {
                     ForEach(ArchiveFormat.allCases) { format in Text(format.rawValue).tag(format) }
                 }
                 .pickerStyle(.segmented)
-                Picker("分卷大小", selection: $state.splitPreset) {
+                Picker(L10n.tr("settings.splitSize"), selection: $state.splitPreset) {
                     ForEach(SplitPreset.all) { preset in Text(preset.title).tag(preset) }
                 }
                 if state.splitPreset.id == "custom" {
                     HStack {
-                        TextField("大小", text: $state.customSplitMB).textFieldStyle(.roundedBorder).frame(width: 90)
+                        TextField(L10n.tr("settings.sizePlaceholder"), text: $state.customSplitMB).textFieldStyle(.roundedBorder).frame(width: 90)
                         Text("MB").foregroundStyle(.secondary)
                     }
                 }
             }
             .formStyle(.grouped)
-            Text("CleanZip 会自动排除 .DS_Store、__MACOSX 和 ._* 元数据。").foregroundStyle(.secondary).font(.footnote)
+            Text(L10n.tr("settings.cleanMetadataNote")).foregroundStyle(.secondary).font(.footnote)
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
-                Button { state.compressSelected() } label: { Label("开始压缩", systemImage: "archivebox") }.buttonStyle(.borderedProminent)
+                Button(L10n.tr("button.cancel")) { dismiss() }
+                Button { state.compressSelected() } label: { Label(L10n.tr("button.startCompress"), systemImage: "archivebox") }.buttonStyle(.borderedProminent)
             }
         }
         .padding(22)
@@ -1431,15 +1452,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         serviceInvoked = true
         let urls = pasteboardURLs(pasteboard)
         guard !urls.isEmpty else {
-            error.pointee = "没有收到 Finder 选中的文件或文件夹。" as NSString
+            error.pointee = L10n.tr("error.noFinderItems") as NSString
             terminateIfServiceOnly()
             return
         }
         let shouldExtract = urls.allSatisfy { ArchiveEngine.shared.isArchive($0) }
-        let operationTitle = shouldExtract ? "正在解压" : "正在压缩"
+        let operationTitle = shouldExtract ? L10n.tr("operation.extracting") : L10n.tr("operation.compressing")
         let operationDetail = shouldExtract
-            ? (urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) 个压缩包")
-            : (urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) 个项目")
+            ? (urls.count == 1 ? urls[0].lastPathComponent : L10n.archiveCount(urls.count))
+            : (urls.count == 1 ? urls[0].lastPathComponent : L10n.itemCount(urls.count))
         serviceProgressHUD.begin(title: operationTitle, detail: operationDetail)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -1456,7 +1477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
                     }
                     DispatchQueue.main.async {
                         self.serviceProgressHUD.finish()
-                        let message = outputs.count == 1 ? "已解压到：\(outputs[0].lastPathComponent)" : "已解压 \(outputs.count) 个压缩包"
+                        let message = outputs.count == 1 ? L10n.tr("notification.extractedTo", outputs[0].lastPathComponent) : L10n.tr("notification.extractedArchives", L10n.archiveCount(outputs.count))
                         AppState.notify(title: "CleanZip", message: message) { self.terminateIfServiceOnly() }
                     }
                 } else {
@@ -1467,14 +1488,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
                     }
                     DispatchQueue.main.async {
                         self.serviceProgressHUD.finish()
-                        let message = "已生成：\(output.lastPathComponent)"
+                        let message = L10n.tr("notification.created", output.lastPathComponent)
                         AppState.notify(title: "CleanZip", message: message) { self.terminateIfServiceOnly() }
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.serviceProgressHUD.finish()
-                    AppState.notify(title: "CleanZip 操作失败", message: error.localizedDescription) {
+                    AppState.notify(title: L10n.tr("notification.operationFailedTitle"), message: error.localizedDescription) {
                         self.terminateIfServiceOnly()
                     }
                 }
@@ -1555,20 +1576,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         switch itemIdentifier {
         case chooseArchiveItemID:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "选择压缩包"
-            item.paletteLabel = "选择压缩包"
-            item.toolTip = "打开压缩包并预览内容"
-            item.image = NSImage(systemSymbolName: "doc.zipper", accessibilityDescription: "选择压缩包")
+            item.label = L10n.tr("toolbar.chooseArchive")
+            item.paletteLabel = L10n.tr("toolbar.chooseArchive")
+            item.toolTip = L10n.tr("toolbar.chooseArchive.tooltip")
+            item.image = NSImage(systemSymbolName: "doc.zipper", accessibilityDescription: L10n.tr("toolbar.chooseArchive"))
             item.visibilityPriority = .high
             item.target = self
             item.action = #selector(openArchiveFromToolbar(_:))
             return item
         case chooseItemsItemID:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "选择项目"
-            item.paletteLabel = "选择项目"
-            item.toolTip = "选择文件或文件夹进行压缩"
-            item.image = NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: "选择项目")
+            item.label = L10n.tr("toolbar.chooseItems")
+            item.paletteLabel = L10n.tr("toolbar.chooseItems")
+            item.toolTip = L10n.tr("toolbar.chooseItems.tooltip")
+            item.image = NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: L10n.tr("toolbar.chooseItems"))
             item.visibilityPriority = .high
             item.target = self
             item.action = #selector(openItemsFromToolbar(_:))
@@ -1576,19 +1597,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         case compactSearchItemID:
             let item = toolbarItem(
                 identifier: itemIdentifier,
-                label: "搜索",
+                label: L10n.tr("toolbar.search"),
                 symbol: "magnifyingglass",
-                tooltip: "搜索压缩包内文件名",
+                tooltip: L10n.tr("toolbar.search.tooltip"),
                 action: #selector(beginSearchFromToolbar(_:))
             )
             item.visibilityPriority = .high
             return item
         case searchItemID:
             let item = NSSearchToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "搜索"
-            item.paletteLabel = "搜索文件名"
-            item.toolTip = "搜索压缩包内文件名"
-            item.searchField.placeholderString = "搜索文件名"
+            item.label = L10n.tr("toolbar.search")
+            item.paletteLabel = L10n.tr("toolbar.search.palette")
+            item.toolTip = L10n.tr("toolbar.search.tooltip")
+            item.searchField.placeholderString = L10n.tr("toolbar.search.placeholder")
             item.searchField.delegate = self
             item.searchField.sendsSearchStringImmediately = true
             item.searchField.sendsWholeSearchString = false
@@ -1601,17 +1622,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         case testArchiveItemID:
             return toolbarItem(
                 identifier: itemIdentifier,
-                label: "测试",
+                label: L10n.tr("toolbar.test"),
                 symbol: "checkmark.shield",
-                tooltip: "测试压缩包完整性",
+                tooltip: L10n.tr("toolbar.test.tooltip"),
                 action: #selector(testArchiveFromToolbar(_:))
             )
         case extractArchiveItemID:
             let item = toolbarItem(
                 identifier: itemIdentifier,
-                label: "解压",
+                label: L10n.tr("toolbar.extract"),
                 symbol: "arrow.down.doc",
-                tooltip: "解压到同目录",
+                tooltip: L10n.tr("toolbar.extract.tooltip"),
                 action: #selector(extractArchiveFromToolbar(_:))
             )
             if #available(macOS 26.0, *) { item.style = .prominent }
@@ -1620,33 +1641,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         case addItemsItemID:
             return toolbarItem(
                 identifier: itemIdentifier,
-                label: "添加",
+                label: L10n.tr("toolbar.add"),
                 symbol: "plus",
-                tooltip: "添加文件或文件夹",
+                tooltip: L10n.tr("toolbar.add.tooltip"),
                 action: #selector(addItemsFromToolbar(_:))
             )
         case removeItemsItemID:
             return toolbarItem(
                 identifier: itemIdentifier,
-                label: "移除",
+                label: L10n.tr("toolbar.remove"),
                 symbol: "minus",
-                tooltip: "移除选中的项目",
+                tooltip: L10n.tr("toolbar.remove.tooltip"),
                 action: #selector(removeItemsFromToolbar(_:))
             )
         case clearItemsItemID:
             return toolbarItem(
                 identifier: itemIdentifier,
-                label: "清空",
+                label: L10n.tr("toolbar.clear"),
                 symbol: "trash",
-                tooltip: "清空已选择项目",
+                tooltip: L10n.tr("toolbar.clear.tooltip"),
                 action: #selector(clearItemsFromToolbar(_:))
             )
         case compressSettingsItemID:
             let item = toolbarItem(
                 identifier: itemIdentifier,
-                label: "压缩设置",
+                label: L10n.tr("toolbar.compressSettings"),
                 symbol: "archivebox",
-                tooltip: "打开压缩格式和分卷设置",
+                tooltip: L10n.tr("toolbar.compressSettings.tooltip"),
                 action: #selector(compressSettingsFromToolbar(_:))
             )
             if #available(macOS 26.0, *) { item.style = .prominent }
