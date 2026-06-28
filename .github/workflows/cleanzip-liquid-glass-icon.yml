@@ -1,0 +1,108 @@
+name: Build CleanZip Liquid Glass Icon
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/cleanzip-liquid-glass-icon.yml"
+      - "README.md"
+      - "LICENSE"
+      - "work/CleanZipBuild/src/main.swift"
+      - "work/CleanZipBuild/src/service.swift"
+      - "work/CleanZipBuild/src/build.sh"
+      - "work/CleanZipBuild/src/package.sh"
+      - "work/CleanZipBuild/src/generate_filled_icon.py"
+      - "work/CleanZipBuild/src/install_icon_assets.sh"
+      - "work/CleanZipBuild/assets/CleanZipIcon.original.icns"
+      - "work/CleanZipBuild/CleanZip.app/**"
+      - "work/CleanZipBuild/CleanZipService.service/**"
+
+jobs:
+  icon:
+    name: Compile AppIcon.icon to Assets.car
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcode="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort | tail -n 1)"
+          if [[ -z "$xcode" ]]; then
+            echo "No Xcode app was found on this runner." >&2
+            exit 2
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          xcodebuild -version
+          xcrun --find actool
+          xcrun --find assetutil
+          xcrun --find ictool || true
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cleanzip-venv"
+          "$RUNNER_TEMP/cleanzip-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/cleanzip-venv/bin/python" -m pip install pillow
+
+      - name: Build app and Finder service from source
+        shell: bash
+        run: work/CleanZipBuild/src/build.sh
+
+      - name: Generate vector Icon Composer document and compile dynamic assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEVELOPER_DIR="$(xcode-select -p)"
+          "$RUNNER_TEMP/cleanzip-venv/bin/python" work/CleanZipBuild/src/generate_filled_icon.py
+          test -f work/CleanZipBuild/CleanZip.app/Contents/Resources/Assets.car
+          test -f work/CleanZipBuild/CleanZipService.service/Contents/Resources/Assets.car
+          find work/CleanZipBuild/AppIcon.icon -maxdepth 2 -type f | sort
+
+      - name: Inspect compiled icon assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_json="$RUNNER_TEMP/Assets.car.json"
+          assetutil --info work/CleanZipBuild/CleanZip.app/Contents/Resources/Assets.car > "$asset_json"
+          python3 - "$asset_json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          assets = json.loads(Path(sys.argv[1]).read_text())
+          text = json.dumps(assets)
+          if "AppIcon" not in text:
+              raise SystemExit("Assets.car does not contain AppIcon.")
+          if "Icon" not in text or "Stack" not in text:
+              raise SystemExit("Assets.car does not appear to contain a dynamic icon stack.")
+          print("Assets.car contains a dynamic app icon image stack.")
+          PY
+
+      - name: Sign app bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          codesign --force --deep --sign - work/CleanZipBuild/CleanZip.app
+          codesign --force --deep --sign - work/CleanZipBuild/CleanZipService.service
+
+      - name: Build installer package
+        shell: bash
+        run: work/CleanZipBuild/src/package.sh
+
+      - name: Upload CleanZip build with dynamic icon
+        uses: actions/upload-artifact@v4
+        with:
+          name: CleanZip-liquid-glass-icon
+          path: |
+            work/CleanZipBuild/CleanZip.app
+            work/CleanZipBuild/CleanZipService.service
+            work/CleanZipBuild/AppIcon.icon
+            work/CleanZipBuild/AppIconVariants
+            work/CleanZipBuild/dist
+            ${{ runner.temp }}/Assets.car.json
+          if-no-files-found: error
