@@ -1,0 +1,98 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "automatic-gradient": "display-p3:0.00000,0.74510,0.85098,1.00000"
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "automatic-gradient": "display-p3:0.00000,0.36078,0.43529,1.00000"
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "color-space-for-untagged-svg-colors": "display-p3",
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "03 Zipper",
+          "image-name": "03-zipper.svg",
+          "glass": true
+        }
+      ],
+      "lighting": "individual",
+      "specular": true,
+      "blur-material": 0.14,
+      "specular-highlight-placement": [
+        0.22,
+        0.08
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.38
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.0
+      }
+    },
+    {
+      "layers": [
+        {
+          "name": "02 Folds",
+          "image-name": "02-folds.svg",
+          "glass": true,
+          "opacity": 0.86
+        }
+      ],
+      "lighting": "individual",
+      "specular": true,
+      "blur-material": 0.46,
+      "specular-highlight-placement": [
+        0.18,
+        0.12
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.0
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.42
+      }
+    },
+    {
+      "layers": [
+        {
+          "name": "01 Pouch body",
+          "image-name": "01-pouch-body.svg",
+          "glass": true
+        }
+      ],
+      "lighting": "combined",
+      "specular": true,
+      "blur-material": 0.62,
+      "specular-highlight-placement": [
+        0.16,
+        0.1
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.42
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.58
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
