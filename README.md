@@ -41,7 +41,7 @@ It is intentionally small: no always-on background app, no history database, no 
 ## Why CleanZip
 
 - Clean by default: ZIP files exclude `.DS_Store`, `__MACOSX/`, and AppleDouble `._*` metadata, making them friendlier for Windows, Linux, and web upload workflows.
-- Native macOS 26 UI: AppKit and SwiftUI window, native toolbar, native table previews, progress HUD, notifications, and a Liquid Glass app icon.
+- Native macOS 26 UI: AppKit and SwiftUI window, native toolbar, native table previews, progress HUD, notifications, and Liquid Glass interface effects.
 - One Finder action: select files, folders, or archives in Finder, then use `CleanZip Compress or Extract`.
 - Preview before extracting: view file names, sizes, modified times, and folder structure without unpacking everything first.
 - Split archives: create multi-part ZIP and 7Z archives for upload limits or transfer constraints.
