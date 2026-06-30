@@ -53,15 +53,6 @@ It is intentionally small: no always-on background app, no history database, no 
   <em>Manage selected files and folders, then create a clean archive.</em>
 </p>
 
-## Why CleanZip
-
-- Clean by default: ZIP files exclude `.DS_Store`, `__MACOSX/`, and AppleDouble `._*` metadata, making them friendlier for Windows, Linux, and web upload workflows.
-- Native macOS 26 UI: AppKit and SwiftUI window, native toolbar, native table previews, progress HUD, notifications, and Liquid Glass interface effects.
-- One Finder action: select files, folders, or archives in Finder, then use `CleanZip Compress or Extract`.
-- Preview before extracting: view file names, sizes, modified times, and folder structure without unpacking everything first.
-- Split archives: create multi-part ZIP and 7Z archives for upload limits or transfer constraints.
-- Lightweight by design: the Finder service launches only when used, and the main app quits when its window closes.
-
 ## Download
 
 Download `CleanZip-2.6.29.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
