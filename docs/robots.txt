@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lyc280705.github.io/CleanZip/sitemap.xml
