@@ -95,11 +95,11 @@ a {
 
 .hero {
   position: relative;
-  min-height: 860px;
+  min-height: 680px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 82px 20px 96px;
+  padding: 92px 20px 118px;
   isolation: isolate;
 }
 
@@ -220,20 +220,6 @@ h1 {
   font-size: 14px;
 }
 
-.hero-showcase {
-  width: min(920px, 100%);
-  margin: 42px auto 0;
-}
-
-.hero-showcase img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow-strong);
-}
-
 .quick-points,
 .section,
 .footer {
@@ -304,11 +290,19 @@ h3 {
 
 .screenshots {
   display: grid;
-  gap: 26px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  width: min(820px, 100%);
+  margin: 0 auto;
 }
 
 figure {
   margin: 0;
+  padding: 10px 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  box-shadow: 0 14px 38px rgba(26, 47, 52, 0.1);
 }
 
 figure img {
@@ -316,13 +310,13 @@ figure img {
   width: 100%;
   height: auto;
   border-radius: 8px;
-  box-shadow: var(--shadow);
 }
 
 figcaption {
-  margin-top: 12px;
+  margin-top: 10px;
   color: var(--muted);
   text-align: center;
+  font-size: 14px;
 }
 
 .feature-grid {
@@ -564,10 +558,6 @@ summary {
     padding-bottom: 56px;
   }
 
-  .hero-showcase {
-    display: none;
-  }
-
   .quick-points,
   .feature-grid,
   .split,
@@ -575,6 +565,11 @@ summary {
   .compat-grid,
   .warning {
     grid-template-columns: 1fr;
+  }
+
+  .screenshots {
+    grid-template-columns: 1fr;
+    width: min(480px, 100%);
   }
 
   .section {
