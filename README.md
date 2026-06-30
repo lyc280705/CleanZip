@@ -87,10 +87,6 @@ Manual installation is also available from `CleanZip-2.6.29.zip`: move `CleanZip
 | Progress | Shows progress for larger compression and extraction jobs in the app and lightweight service HUD. |
 | Localization | Localized app UI, Finder service menu, notifications, errors, and document metadata. |
 
-## Search Keywords
-
-CleanZip is useful if you are looking for a macOS archive utility, clean ZIP creator, `.DS_Store` remover, Finder Quick Action compressor, RAR extractor, 7Z extractor, split ZIP creator, split 7Z creator, or lightweight Keka/BetterZip-style alternative focused on simple everyday archive workflows.
-
 ## Supported Formats
 
 CleanZip can preview and extract common archive formats supported by bundled `7zz`, including:
