@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>A lightweight native macOS 26 archive app for clean ZIPs, quick previews, Finder right-click actions, and split archives.</strong>
+  <strong>A lightweight native macOS 26 archive app for clean ZIPs, RAR/7Z extraction, quick previews, Finder right-click actions, and split archives.</strong>
 </p>
 
 <p align="center">
@@ -16,9 +16,24 @@
   <a href="#build-from-source">Build from source</a>
 </p>
 
-CleanZip is built for the everyday archive jobs that should be fast and boring: create ZIP files that do not contain macOS metadata, inspect an archive before extracting it, split large archives, and use one clear Finder action instead of a crowded context menu.
+<p align="center">
+  <a href="https://github.com/lyc280705/CleanZip/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/lyc280705/CleanZip?label=download"></a>
+  <img alt="macOS 26" src="https://img.shields.io/badge/macOS-26+-black">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-native-orange">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
+
+CleanZip is built for the everyday archive jobs that should be fast and boring: create ZIP files that do not contain macOS metadata, remove `.DS_Store` noise before sharing, inspect an archive before extracting it, split large archives, and use one clear Finder action instead of a crowded context menu.
 
 It is intentionally small: no always-on background app, no history database, no archive editor, and no heavy all-in-one file manager.
+
+## Best For
+
+- Sending ZIP files to Windows or Linux users without hidden macOS metadata.
+- Quickly previewing ZIP, 7Z, RAR, TAR, and other archives before extracting them.
+- Creating split ZIP or split 7Z archives for upload limits.
+- Keeping Finder's right-click menu simple with one compress/extract action.
+- Using a local-first archive utility that does not upload files or keep history.
 
 ## Screenshots
 
@@ -49,7 +64,7 @@ It is intentionally small: no always-on background app, no history database, no 
 
 ## Download
 
-Download `CleanZip-2.6.29.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest).
+Download `CleanZip-2.6.29.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
 
 The installer places:
 
@@ -71,6 +86,10 @@ Manual installation is also available from `CleanZip-2.6.29.zip`: move `CleanZip
 | Split archive creation | Supports split ZIP and split 7Z creation with common presets and custom sizes. |
 | Progress | Shows progress for larger compression and extraction jobs in the app and lightweight service HUD. |
 | Localization | Localized app UI, Finder service menu, notifications, errors, and document metadata. |
+
+## Search Keywords
+
+CleanZip is useful if you are looking for a macOS archive utility, clean ZIP creator, `.DS_Store` remover, Finder Quick Action compressor, RAR extractor, 7Z extractor, split ZIP creator, split 7Z creator, or lightweight Keka/BetterZip-style alternative focused on simple everyday archive workflows.
 
 ## Supported Formats
 
