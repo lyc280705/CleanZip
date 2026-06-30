@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>A lightweight native macOS 26 archive app for clean ZIPs, RAR/7Z extraction, quick previews, Finder right-click actions, and split archives.</strong>
+  <strong>A lightweight native macOS archive app for clean ZIPs, RAR/7Z extraction, quick previews, Finder right-click actions, and split archives.</strong>
 </p>
 
 <p align="center">
@@ -13,14 +13,15 @@
   ·
   <a href="https://lyc280705.github.io/CleanZip/">Product page</a>
   ·
-  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.29">CleanZip 2.6.29</a>
+  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.30">CleanZip 2.6.30</a>
   ·
   <a href="#build-from-source">Build from source</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/lyc280705/CleanZip/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/lyc280705/CleanZip?label=download"></a>
-  <img alt="macOS 26" src="https://img.shields.io/badge/macOS-26+-black">
+  <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-black">
+  <img alt="Intel and Apple Silicon" src="https://img.shields.io/badge/Universal-Intel%20%2B%20Apple%20Silicon-0a7">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-native-orange">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
@@ -36,6 +37,7 @@ It is intentionally small: no always-on background app, no history database, no 
 - Creating split ZIP or split 7Z archives for upload limits.
 - Keeping Finder's right-click menu simple with one compress/extract action.
 - Using a local-first archive utility that does not upload files or keep history.
+- Running the same app on supported Intel and Apple Silicon Macs.
 
 ## Screenshots
 
@@ -57,16 +59,28 @@ It is intentionally small: no always-on background app, no history database, no 
 
 ## Download
 
-Download `CleanZip-2.6.29.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
+Download `CleanZip-2.6.30.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
 
 The installer places:
 
 - `CleanZip.app` in `/Applications`
 - `CleanZipService.service` in `/Library/Services`
 
-The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID. If macOS blocks the first launch, use Finder's **Open** action from the context menu and confirm once.
+CleanZip is ad-hoc signed for open source distribution, but it is not notarized with an Apple Developer ID. If macOS shows a warning such as "Apple could not verify CleanZip is free of malware":
 
-Manual installation is also available from `CleanZip-2.6.29.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
+1. Open Finder and go to `/Applications`.
+2. Control-click `CleanZip.app`, choose **Open**, then confirm.
+3. If macOS still blocks it, open **System Settings** -> **Privacy & Security** and choose **Open Anyway** for CleanZip.
+
+After you approve it once, CleanZip opens normally.
+
+Manual installation is also available from `CleanZip-2.6.30.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
+
+## Compatibility
+
+CleanZip requires macOS 14 or later. The app, Finder service, and bundled `7zz` helper are universal binaries with both x86_64 and arm64 slices, so the same download works on supported Intel and Apple Silicon Macs.
+
+On macOS 26, CleanZip uses Liquid Glass interface effects where available. On macOS 14 and 15, it falls back to native AppKit visual effects and standard toolbar behavior.
 
 ## Features
 
@@ -78,6 +92,7 @@ Manual installation is also available from `CleanZip-2.6.29.zip`: move `CleanZip
 | Extraction | Extracts common formats through bundled `7zz` and system tools. |
 | Split archive creation | Supports split ZIP and split 7Z creation with common presets and custom sizes. |
 | Progress | Shows progress for larger compression and extraction jobs in the app and lightweight service HUD. |
+| Compatibility | Universal app for supported Intel and Apple Silicon Macs running macOS 14 or later. |
 | Localization | Localized app UI, Finder service menu, notifications, errors, and document metadata. |
 
 ## Supported Formats

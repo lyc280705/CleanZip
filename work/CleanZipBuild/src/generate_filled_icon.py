@@ -447,7 +447,7 @@ def compile_asset_catalog_if_possible() -> Path | None:
         "--platform",
         "macosx",
         "--minimum-deployment-target",
-        "26.0",
+        os.environ.get("MACOSX_DEPLOYMENT_TARGET", "14.0"),
     ]
     subprocess.run(command, check=True)
     partial_info.unlink(missing_ok=True)

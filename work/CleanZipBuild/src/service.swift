@@ -269,14 +269,33 @@ final class ServiceProgressHUD {
         panel.isOpaque = false
         panel.backgroundColor = .clear
 
-        let glassView = NSGlassEffectView()
-        glassView.style = .regular
-        glassView.cornerRadius = 24
-        glassView.translatesAutoresizingMaskIntoConstraints = false
-
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
-        glassView.contentView = contentView
+
+        let rootView: NSView
+        if #available(macOS 26.0, *) {
+            let glassView = NSGlassEffectView()
+            glassView.style = .regular
+            glassView.cornerRadius = 24
+            glassView.contentView = contentView
+            rootView = glassView
+        } else {
+            let visualEffectView = NSVisualEffectView()
+            visualEffectView.material = .hudWindow
+            visualEffectView.blendingMode = .behindWindow
+            visualEffectView.state = .active
+            visualEffectView.wantsLayer = true
+            visualEffectView.layer?.cornerRadius = 24
+            visualEffectView.layer?.masksToBounds = true
+            visualEffectView.addSubview(contentView)
+            NSLayoutConstraint.activate([
+                contentView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
+                contentView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+                contentView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
+                contentView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor)
+            ])
+            rootView = visualEffectView
+        }
 
         let titleField = NSTextField(labelWithString: title)
         titleField.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -315,7 +334,7 @@ final class ServiceProgressHUD {
 
         contentView.addSubview(textStack)
         contentView.addSubview(bottomStack)
-        panel.contentView = glassView
+        panel.contentView = rootView
 
         NSLayoutConstraint.activate([
             textStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),

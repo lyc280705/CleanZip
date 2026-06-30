@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CleanZip for macOS - Clean ZIP, RAR/7Z Extractor, Archive Preview</title>
+    <title>CleanZip for macOS 14+ - Clean ZIP, RAR/7Z Extractor, Archive Preview</title>
     <meta name="description" content="CleanZip creates clean ZIPs without .DS_Store metadata, previews archives, extracts RAR/7Z, and adds native macOS UI with one Finder action.">
     <meta name="robots" content="index,follow,max-image-preview:large">
     <meta name="theme-color" content="#0fb9c8">
@@ -28,13 +28,13 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "CleanZip",
-        "operatingSystem": "macOS 26",
+        "operatingSystem": "macOS 14 or later",
         "applicationCategory": "UtilitiesApplication",
         "description": "A lightweight native macOS archive utility for clean ZIP creation without .DS_Store metadata, archive previews, extraction, split archives, and Finder actions.",
         "url": "https://lyc280705.github.io/CleanZip/",
         "image": "https://lyc280705.github.io/CleanZip/images/app-icon.png",
         "downloadUrl": "https://github.com/lyc280705/CleanZip/releases/latest",
-        "softwareVersion": "2.6.29",
+        "softwareVersion": "2.6.30",
         "license": "https://github.com/lyc280705/CleanZip/blob/main/LICENSE",
         "codeRepository": "https://github.com/lyc280705/CleanZip",
         "sameAs": [
@@ -67,6 +67,11 @@
         <img class="hero-backdrop" src="images/archive-preview.png" alt="CleanZip archive preview interface">
         <div class="hero-content">
           <img class="hero-icon" src="images/app-icon.png" alt="CleanZip app icon" width="112" height="112">
+          <div class="hero-badges" aria-label="Compatibility and release highlights">
+            <span>macOS 14+</span>
+            <span>Intel + Apple Silicon</span>
+            <span>Liquid Glass on macOS 26</span>
+          </div>
           <p class="eyebrow">Native macOS archive utility</p>
           <h1 id="hero-title">Clean ZIPs, archive previews, and one Finder action.</h1>
           <p class="hero-copy">
@@ -77,7 +82,10 @@
             <a class="button primary" href="https://github.com/lyc280705/CleanZip/releases/latest">Download for macOS</a>
             <a class="button secondary" href="https://github.com/lyc280705/CleanZip">View on GitHub</a>
           </div>
-          <p class="release-note">Latest release: CleanZip 2.6.29. Local-first, MIT licensed, no permanent background service.</p>
+          <p class="release-note">Latest release: CleanZip 2.6.30. Universal app for Intel and Apple Silicon Macs.</p>
+          <div class="hero-showcase">
+            <img src="images/archive-preview.png" alt="CleanZip archive preview window with native macOS table controls">
+          </div>
         </div>
       </section>
 
@@ -95,8 +103,8 @@
           <span>One right-click service for compressing or extracting selected items.</span>
         </div>
         <div>
-          <strong>Split archives</strong>
-          <span>Create split ZIP and split 7Z archives for upload limits.</span>
+          <strong>Universal app</strong>
+          <span>Runs on supported Intel and Apple Silicon Macs with macOS 14 or later.</span>
         </div>
       </section>
 
@@ -139,8 +147,8 @@
           <p>No history database, no account, no cloud upload, no archive editor, and no always-on background app.</p>
         </article>
         <article>
-          <h3>macOS 26 native feel</h3>
-          <p>Uses AppKit and SwiftUI, native toolbar controls, progress HUD, notifications, and Liquid Glass interface effects.</p>
+          <h3>Native macOS feel</h3>
+          <p>Uses AppKit and SwiftUI, native toolbar controls, progress HUD, notifications, and Liquid Glass interface effects on macOS 26.</p>
         </article>
         <article>
           <h3>Localized interface</h3>
@@ -180,10 +188,26 @@
           <h2 id="install-title">Download the package and start from Finder.</h2>
         </div>
         <ol>
-          <li>Download <a href="https://github.com/lyc280705/CleanZip/releases/latest">CleanZip-2.6.29.pkg</a>.</li>
+          <li>Download <a href="https://github.com/lyc280705/CleanZip/releases/latest">CleanZip-2.6.30.pkg</a>.</li>
           <li>Open the installer. It installs CleanZip.app and the Finder service.</li>
           <li>Select files, folders, or archives in Finder and choose CleanZip Compress or Extract.</li>
         </ol>
+      </section>
+
+      <section class="section warning" aria-labelledby="warning-title">
+        <div>
+          <p class="eyebrow">First launch</p>
+          <h2 id="warning-title">If macOS shows a security warning.</h2>
+        </div>
+        <div class="warning-copy">
+          <p>CleanZip is ad-hoc signed and open source, but it is not notarized with an Apple Developer ID. macOS may show a warning such as “Apple could not verify CleanZip is free of malware.”</p>
+          <ol>
+            <li>Install the package normally.</li>
+            <li>Open Finder, go to <strong>Applications</strong>, Control-click <strong>CleanZip.app</strong>, then choose <strong>Open</strong>.</li>
+            <li>If macOS still blocks it, open <strong>System Settings</strong> → <strong>Privacy &amp; Security</strong>, then choose <strong>Open Anyway</strong> for CleanZip.</li>
+          </ol>
+          <p>After you approve it once, CleanZip opens normally.</p>
+        </div>
       </section>
 
       <section class="section faq" aria-labelledby="faq-title">
@@ -200,8 +224,12 @@
           <p>No. CleanZip can extract RAR archives, but archive creation is intentionally focused on ZIP and 7Z.</p>
         </details>
         <details>
+          <summary>Which macOS versions are supported?</summary>
+          <p>CleanZip requires macOS 14 or later. The app and bundled 7zz helper are universal binaries for Intel and Apple Silicon Macs.</p>
+        </details>
+        <details>
           <summary>Is the package notarized?</summary>
-          <p>No. The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID.</p>
+          <p>No. The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID. See the first-launch steps above if Gatekeeper blocks it.</p>
         </details>
       </section>
     </main>

@@ -718,14 +718,33 @@ final class ServiceProgressHUD {
         panel.isOpaque = false
         panel.backgroundColor = .clear
 
-        let glassView = NSGlassEffectView()
-        glassView.style = .regular
-        glassView.cornerRadius = 24
-        glassView.translatesAutoresizingMaskIntoConstraints = false
-
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
-        glassView.contentView = contentView
+
+        let rootView: NSView
+        if #available(macOS 26.0, *) {
+            let glassView = NSGlassEffectView()
+            glassView.style = .regular
+            glassView.cornerRadius = 24
+            glassView.contentView = contentView
+            rootView = glassView
+        } else {
+            let visualEffectView = NSVisualEffectView()
+            visualEffectView.material = .hudWindow
+            visualEffectView.blendingMode = .behindWindow
+            visualEffectView.state = .active
+            visualEffectView.wantsLayer = true
+            visualEffectView.layer?.cornerRadius = 24
+            visualEffectView.layer?.masksToBounds = true
+            visualEffectView.addSubview(contentView)
+            NSLayoutConstraint.activate([
+                contentView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
+                contentView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+                contentView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
+                contentView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor)
+            ])
+            rootView = visualEffectView
+        }
 
         let titleField = NSTextField(labelWithString: title)
         titleField.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -765,7 +784,7 @@ final class ServiceProgressHUD {
 
         contentView.addSubview(textStack)
         contentView.addSubview(bottomStack)
-        panel.contentView = glassView
+        panel.contentView = rootView
 
         NSLayoutConstraint.activate([
             textStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
@@ -1540,6 +1559,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        if #available(macOS 15.0, *) { return allToolbarItemIdentifiers }
+        return visibleToolbarItemIdentifiers()
+    }
+
+    private var allToolbarItemIdentifiers: [NSToolbarItem.Identifier] {
         [
             .flexibleSpace,
             compactSearchItemID,
@@ -1553,6 +1577,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             extractArchiveItemID,
             compressSettingsItemID
         ]
+    }
+
+    private func visibleToolbarItemIdentifiers() -> [NSToolbarItem.Identifier] {
+        let state = AppState.shared
+        let showingArchive = state.archiveURL != nil
+        let showingSelectedItems = !state.selectedURLs.isEmpty
+        let showExpandedSearch = showingArchive && (searchExpanded || !state.searchText.isEmpty)
+
+        var identifiers: [NSToolbarItem.Identifier] = [.flexibleSpace]
+        if showingArchive {
+            identifiers.append(showExpandedSearch ? searchItemID : compactSearchItemID)
+            identifiers.append(testArchiveItemID)
+        }
+        if showingSelectedItems {
+            identifiers.append(contentsOf: [addItemsItemID, removeItemsItemID, clearItemsItemID])
+        }
+        identifiers.append(contentsOf: [chooseArchiveItemID, chooseItemsItemID])
+        if showingArchive {
+            identifiers.append(extractArchiveItemID)
+        }
+        if showingSelectedItems {
+            identifiers.append(compressSettingsItemID)
+        }
+        return identifiers
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -1738,24 +1786,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         let showingArchive = state.archiveURL != nil
         let showingSelectedItems = !state.selectedURLs.isEmpty
         let showExpandedSearch = showingArchive && (searchExpanded || !state.searchText.isEmpty)
-        for item in toolbar.items {
-            switch item.itemIdentifier {
-            case compactSearchItemID:
-                item.isHidden = !showingArchive || showExpandedSearch
-            case searchItemID:
-                item.isHidden = !showExpandedSearch
-                if let searchItem = item as? NSSearchToolbarItem, searchItem.searchField.stringValue != state.searchText {
-                    searchItem.searchField.stringValue = state.searchText
+        if #available(macOS 15.0, *) {
+            for item in toolbar.items {
+                switch item.itemIdentifier {
+                case compactSearchItemID:
+                    item.isHidden = !showingArchive || showExpandedSearch
+                case searchItemID:
+                    item.isHidden = !showExpandedSearch
+                    if let searchItem = item as? NSSearchToolbarItem, searchItem.searchField.stringValue != state.searchText {
+                        searchItem.searchField.stringValue = state.searchText
+                    }
+                case testArchiveItemID, extractArchiveItemID:
+                    item.isHidden = !showingArchive
+                case addItemsItemID, removeItemsItemID, clearItemsItemID, compressSettingsItemID:
+                    item.isHidden = !showingSelectedItems
+                default:
+                    break
                 }
-            case testArchiveItemID, extractArchiveItemID:
-                item.isHidden = !showingArchive
-            case addItemsItemID, removeItemsItemID, clearItemsItemID, compressSettingsItemID:
-                item.isHidden = !showingSelectedItems
-            default:
-                break
+            }
+        } else {
+            refreshLegacyToolbarItems(toolbar)
+            if let searchItem = toolbar.items.first(where: { $0.itemIdentifier == searchItemID }) as? NSSearchToolbarItem,
+               searchItem.searchField.stringValue != state.searchText {
+                searchItem.searchField.stringValue = state.searchText
             }
         }
         toolbar.validateVisibleItems()
+    }
+
+    private func refreshLegacyToolbarItems(_ toolbar: NSToolbar) {
+        let desired = visibleToolbarItemIdentifiers()
+        let current = toolbar.items.map(\.itemIdentifier)
+        guard current != desired else { return }
+        if !toolbar.items.isEmpty {
+            for index in stride(from: toolbar.items.count - 1, through: 0, by: -1) {
+                toolbar.removeItem(at: index)
+            }
+        }
+        for (index, identifier) in desired.enumerated() {
+            toolbar.insertItem(withItemIdentifier: identifier, at: index)
+        }
     }
 
     private func terminateIfServiceOnly() { if serviceInvoked && window == nil { NSApp.terminate(nil) } }
