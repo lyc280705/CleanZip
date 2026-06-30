@@ -66,13 +66,24 @@ The installer places:
 - `CleanZip.app` in `/Applications`
 - `CleanZipService.service` in `/Library/Services`
 
-CleanZip is ad-hoc signed for open source distribution, but it is not notarized with an Apple Developer ID. If macOS shows a warning such as "Apple could not verify CleanZip is free of malware":
+CleanZip is ad-hoc signed for open source distribution, but it is not notarized with an Apple Developer ID. macOS may block the installer before it opens and show a warning such as "Apple could not verify CleanZip is free of malware."
 
-1. Open Finder and go to `/Applications`.
-2. Control-click `CleanZip.app`, choose **Open**, then confirm.
-3. If macOS still blocks it, open **System Settings** -> **Privacy & Security** and choose **Open Anyway** for CleanZip.
+For the `.pkg` installer:
 
-After you approve it once, CleanZip opens normally.
+1. In Finder, Control-click `CleanZip-2.6.30.pkg` and choose **Open**.
+2. If the same warning still appears with only **Done** and **Move to Trash**, open **System Settings** -> **Privacy & Security**.
+3. At the bottom of Privacy & Security, choose **Open Anyway** for `CleanZip-2.6.30.pkg`, then confirm.
+
+After installation, if macOS blocks `CleanZip.app` itself, Control-click `CleanZip.app` in `/Applications` and choose **Open**. If it is still blocked, use **System Settings** -> **Privacy & Security** -> **Open Anyway** for `CleanZip.app`.
+
+After you approve the installer or app once, macOS opens it normally.
+
+Advanced terminal alternative for the downloaded package:
+
+```bash
+xattr -dr com.apple.quarantine ~/Downloads/CleanZip-2.6.30.pkg
+open ~/Downloads/CleanZip-2.6.30.pkg
+```
 
 Manual installation is also available from `CleanZip-2.6.30.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
 

@@ -193,17 +193,18 @@
 
       <section class="section warning" aria-labelledby="warning-title">
         <div>
-          <p class="eyebrow">First launch</p>
-          <h2 id="warning-title">If macOS shows a security warning.</h2>
+          <p class="eyebrow">First install</p>
+          <h2 id="warning-title">If macOS blocks the installer.</h2>
         </div>
         <div class="warning-copy">
-          <p>CleanZip is ad-hoc signed and open source, but it is not notarized with an Apple Developer ID. macOS may show a warning such as “Apple could not verify CleanZip is free of malware.”</p>
+          <p>CleanZip is ad-hoc signed and open source, but it is not notarized with an Apple Developer ID. macOS may block <strong>CleanZip-2.6.30.pkg</strong> before the installer opens and show a warning such as “Apple could not verify CleanZip is free of malware.”</p>
           <ol>
-            <li>Install the package normally.</li>
-            <li>Open Finder, go to <strong>Applications</strong>, Control-click <strong>CleanZip.app</strong>, then choose <strong>Open</strong>.</li>
-            <li>If macOS still blocks it, open <strong>System Settings</strong> → <strong>Privacy &amp; Security</strong>, then choose <strong>Open Anyway</strong> for CleanZip.</li>
+            <li>In Finder, Control-click <strong>CleanZip-2.6.30.pkg</strong>, then choose <strong>Open</strong>.</li>
+            <li>If the same warning still appears with only <strong>Done</strong> and <strong>Move to Trash</strong>, open <strong>System Settings</strong> → <strong>Privacy &amp; Security</strong>.</li>
+            <li>At the bottom of Privacy &amp; Security, choose <strong>Open Anyway</strong> for <strong>CleanZip-2.6.30.pkg</strong>, then confirm.</li>
+            <li>After installation, if macOS blocks <strong>CleanZip.app</strong>, repeat the same <strong>Open Anyway</strong> step for the app.</li>
           </ol>
-          <p>After you approve it once, CleanZip opens normally.</p>
+          <p>After you approve the installer or app once, macOS opens it normally.</p>
         </div>
       </section>
 
@@ -226,7 +227,7 @@
         </details>
         <details>
           <summary>Is the package notarized?</summary>
-          <p>No. The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID. See the first-launch steps above if Gatekeeper blocks it.</p>
+          <p>No. The package is ad-hoc signed for local distribution, but it is not notarized with an Apple Developer ID. See the first-install steps above if Gatekeeper blocks the installer or app.</p>
         </details>
       </section>
     </main>
