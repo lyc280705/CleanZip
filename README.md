@@ -11,6 +11,8 @@
 <p align="center">
   <a href="https://github.com/lyc280705/CleanZip/releases/latest">Download latest release</a>
   ·
+  <a href="https://lyc280705.github.io/CleanZip/">Product page</a>
+  ·
   <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.29">CleanZip 2.6.29</a>
   ·
   <a href="#build-from-source">Build from source</a>
