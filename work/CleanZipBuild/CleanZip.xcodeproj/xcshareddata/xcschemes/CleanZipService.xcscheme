@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "AE06E16A68F164145408F981"
+               BlueprintIdentifier = "47F372505E84F2CDE3A8228E"
                BuildableName = "CleanZipService.service"
                BlueprintName = "CleanZipService"
                ReferencedContainer = "container:CleanZip.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AE06E16A68F164145408F981"
+            BlueprintIdentifier = "47F372505E84F2CDE3A8228E"
             BuildableName = "CleanZipService.service"
             BlueprintName = "CleanZipService"
             ReferencedContainer = "container:CleanZip.xcodeproj">
@@ -53,7 +53,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AE06E16A68F164145408F981"
+            BlueprintIdentifier = "47F372505E84F2CDE3A8228E"
             BuildableName = "CleanZipService.service"
             BlueprintName = "CleanZipService"
             ReferencedContainer = "container:CleanZip.xcodeproj">
@@ -70,7 +70,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AE06E16A68F164145408F981"
+            BlueprintIdentifier = "47F372505E84F2CDE3A8228E"
             BuildableName = "CleanZipService.service"
             BlueprintName = "CleanZipService"
             ReferencedContainer = "container:CleanZip.xcodeproj">

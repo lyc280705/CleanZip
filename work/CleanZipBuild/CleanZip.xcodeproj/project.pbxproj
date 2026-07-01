@@ -7,152 +7,134 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1BB8FAB1E550939EDFE13E0D /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2162961B7680E20E04C9A0D /* Cocoa.framework */; };
-		3E66C454FED9B147BB232A51 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */; };
-		43FD213F0B3D5B37D5D72400 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D11A5528F00BF39DE67A875 /* AppIcon.icon */; };
-		57D7315CD2F0C93A27D6B2AB /* service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B571B3055BE111C95358C38 /* service.swift */; };
-		67BE48B0AC03E1C29618EAAF /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF32F5E94F385DDE13F8622A /* main.swift */; };
-		80BDB89F607C1DDB5823DD0D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */; };
-		E9CD5FC88887CEF99A063D9D /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2162961B7680E20E04C9A0D /* Cocoa.framework */; };
-		F5111089C916D7CC32C2C143 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D11A5528F00BF39DE67A875 /* AppIcon.icon */; };
+		0761278721877752C7D07C8B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 174049453FBF1D651378DD77 /* Cocoa.framework */; };
+		0BD2C4DE9E402385698C783B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */; };
+		0FC4B6ED47B560EAA5CC7142 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */; };
+		20D16F199B627A95DA15DA6A /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 174049453FBF1D651378DD77 /* Cocoa.framework */; };
+		4B6688D7534B62D12DAA7805 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 012CF8C36EBB5EB34C2CA5F5 /* AppIcon.icon */; };
+		726D9D08C09C22B554DCF831 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 012CF8C36EBB5EB34C2CA5F5 /* AppIcon.icon */; };
+		AC04038C3012111273B1D09F /* service.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEBE149A835D3B3343344720 /* service.swift */; };
+		D7AFCD49BF3A030278A4AA01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFFEFF84818CF85AEEB45D5 /* main.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		120A1E651DC2DDBF1A41ABDC /* CleanZip-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZip-Info.plist"; sourceTree = "<group>"; };
-		2D11A5528F00BF39DE67A875 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
-		2F59546ACFBDC3576A7F3E01 /* CleanZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZip.app; path = CleanZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		31663EA5B67083822C103A75 /* CleanZipIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = CleanZipIcon.icns; sourceTree = "<group>"; };
-		5381B883428637F8BDCCD60A /* CleanZipService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZipService-Info.plist"; sourceTree = "<group>"; };
-		574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		6D41881515334903B82F091B /* 7zz */ = {isa = PBXFileReference; includeInIndex = 1; path = 7zz; sourceTree = "<group>"; };
-		7B5EC6ACEEF009BB645930BE /* 7-Zip-readme.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-readme.txt"; sourceTree = "<group>"; };
-		9B571B3055BE111C95358C38 /* service.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = service.swift; sourceTree = "<group>"; };
-		A86BA3BE400A582927A4EEC6 /* AppIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = AppIcon.icns; sourceTree = "<group>"; };
-		B2845280F3FDF22B92B0A083 /* 7-Zip-License.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-License.txt"; sourceTree = "<group>"; };
-		CF32F5E94F385DDE13F8622A /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		E2162961B7680E20E04C9A0D /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		F62BEA952460599805CA12B0 /* CleanZipService.service */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZipService.service; path = CleanZipService.service; sourceTree = BUILT_PRODUCTS_DIR; };
+		012CF8C36EBB5EB34C2CA5F5 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		0D49D37CFF6FD797B7E67E40 /* CleanZipService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZipService-Info.plist"; sourceTree = "<group>"; };
+		174049453FBF1D651378DD77 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		1E7D8EA060624BC697B215CD /* 7-Zip-License.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-License.txt"; sourceTree = "<group>"; };
+		2D6DF54690D5ABB1CF590960 /* CleanZipService.service */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZipService.service; path = CleanZipService.service; sourceTree = BUILT_PRODUCTS_DIR; };
+		5402186A9FA7F5973A47C7EA /* 7-Zip-readme.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-readme.txt"; sourceTree = "<group>"; };
+		AEFFEFF84818CF85AEEB45D5 /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		BBA7C1B39D9A694596EC46EF /* AppIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = AppIcon.icns; sourceTree = "<group>"; };
+		C66AE3B342D060146A222F1E /* 7zz */ = {isa = PBXFileReference; includeInIndex = 1; path = 7zz; sourceTree = "<group>"; };
+		C87D373B3D4CB051FD1232B8 /* CleanZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZip.app; path = CleanZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CEBE149A835D3B3343344720 /* service.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = service.swift; sourceTree = "<group>"; };
+		DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E6600F71B019D3F31D29320C /* CleanZipIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = CleanZipIcon.icns; sourceTree = "<group>"; };
+		F6CA192D42B61691A4B05B03 /* CleanZip-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZip-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		21921A5E15B13D90CE941259 /* Frameworks */ = {
+		70BF9AF1DDE791FAF23A69C7 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1BB8FAB1E550939EDFE13E0D /* Cocoa.framework in Frameworks */,
+				0761278721877752C7D07C8B /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		42F44F424C63FB01C97DB040 /* Frameworks */ = {
+		A74B71EFD55F12A2F837197E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E9CD5FC88887CEF99A063D9D /* Cocoa.framework in Frameworks */,
+				20D16F199B627A95DA15DA6A /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		94FD87E374AD7E020885B767 /* src */ = {
+		3C684DAA4D15D84C30B29039 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				D863579008C0B8F877050801 /* Resources */,
-				CF32F5E94F385DDE13F8622A /* main.swift */,
-				9B571B3055BE111C95358C38 /* service.swift */,
-				120A1E651DC2DDBF1A41ABDC /* CleanZip-Info.plist */,
-				5381B883428637F8BDCCD60A /* CleanZipService-Info.plist */,
+				5F19354BDF3CE3E4B5BC50D8 /* Resources */,
+				AEFFEFF84818CF85AEEB45D5 /* main.swift */,
+				CEBE149A835D3B3343344720 /* service.swift */,
+				F6CA192D42B61691A4B05B03 /* CleanZip-Info.plist */,
+				0D49D37CFF6FD797B7E67E40 /* CleanZipService-Info.plist */,
 			);
 			name = src;
 			path = src;
 			sourceTree = "<group>";
 		};
-		9BB73B72306D0005A362512B /* OS X */ = {
+		4D973DAE9F5FB0E96CA344EF /* Icon */ = {
 			isa = PBXGroup;
 			children = (
-				E2162961B7680E20E04C9A0D /* Cocoa.framework */,
+				012CF8C36EBB5EB34C2CA5F5 /* AppIcon.icon */,
 			);
-			name = "OS X";
+			name = Icon;
 			sourceTree = "<group>";
 		};
-		A2A494A088DF05A79DCD4D62 = {
+		5D11479D1CA65D8E4BCCA15C = {
 			isa = PBXGroup;
 			children = (
-				C1B3426564E12657516FB7E5 /* Products */,
-				BD6A861597D362785EEDB206 /* Frameworks */,
-				94FD87E374AD7E020885B767 /* src */,
-				FEB78E1EF80DE9997B1FA3E7 /* Icon */,
-				574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */,
+				EA99DEB5793E991FD8DD2C02 /* Products */,
+				841860B6B7CB9717C612C892 /* Frameworks */,
+				3C684DAA4D15D84C30B29039 /* src */,
+				4D973DAE9F5FB0E96CA344EF /* Icon */,
+				DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
-		BD6A861597D362785EEDB206 /* Frameworks */ = {
+		5F19354BDF3CE3E4B5BC50D8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				9BB73B72306D0005A362512B /* OS X */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		C1B3426564E12657516FB7E5 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				2F59546ACFBDC3576A7F3E01 /* CleanZip.app */,
-				F62BEA952460599805CA12B0 /* CleanZipService.service */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		D863579008C0B8F877050801 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				6D41881515334903B82F091B /* 7zz */,
-				B2845280F3FDF22B92B0A083 /* 7-Zip-License.txt */,
-				7B5EC6ACEEF009BB645930BE /* 7-Zip-readme.txt */,
-				A86BA3BE400A582927A4EEC6 /* AppIcon.icns */,
-				31663EA5B67083822C103A75 /* CleanZipIcon.icns */,
+				C66AE3B342D060146A222F1E /* 7zz */,
+				1E7D8EA060624BC697B215CD /* 7-Zip-License.txt */,
+				5402186A9FA7F5973A47C7EA /* 7-Zip-readme.txt */,
+				BBA7C1B39D9A694596EC46EF /* AppIcon.icns */,
+				E6600F71B019D3F31D29320C /* CleanZipIcon.icns */,
 			);
 			name = Resources;
 			path = src/Resources;
 			sourceTree = "<group>";
 		};
-		FEB78E1EF80DE9997B1FA3E7 /* Icon */ = {
+		841860B6B7CB9717C612C892 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				2D11A5528F00BF39DE67A875 /* AppIcon.icon */,
+				8B3B89096CF01D4D5BFFA0AD /* OS X */,
 			);
-			name = Icon;
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8B3B89096CF01D4D5BFFA0AD /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				174049453FBF1D651378DD77 /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		EA99DEB5793E991FD8DD2C02 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C87D373B3D4CB051FD1232B8 /* CleanZip.app */,
+				2D6DF54690D5ABB1CF590960 /* CleanZipService.service */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		426B4E720456AAC5C7699E6D /* CleanZip */ = {
+		47F372505E84F2CDE3A8228E /* CleanZipService */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 014A685E7483268470808D69 /* Build configuration list for PBXNativeTarget "CleanZip" */;
+			buildConfigurationList = C76A259C390657C6FADA4D98 /* Build configuration list for PBXNativeTarget "CleanZipService" */;
 			buildPhases = (
-				4F74650C767120F10C4653A8 /* Sources */,
-				42F44F424C63FB01C97DB040 /* Frameworks */,
-				B0E35CD94EB96B1071F84306 /* Resources */,
-				4B991B97767AB639D6CBA0C5 /* Copy CleanZip Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = CleanZip;
-			productName = CleanZip;
-			productReference = 2F59546ACFBDC3576A7F3E01 /* CleanZip.app */;
-			productType = "com.apple.product-type.application";
-		};
-		AE06E16A68F164145408F981 /* CleanZipService */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 7F6E375266E7B614C84FADD3 /* Build configuration list for PBXNativeTarget "CleanZipService" */;
-			buildPhases = (
-				BC6FBE2923052E71A8C3FC62 /* Sources */,
-				21921A5E15B13D90CE941259 /* Frameworks */,
-				49432F200CF1312DB7EC4204 /* Resources */,
-				D274EAA5A059419933A04B23 /* Copy CleanZip Resources */,
+				433E365629BBB9C696AAA41F /* Sources */,
+				A74B71EFD55F12A2F837197E /* Frameworks */,
+				099B8B57123C0C22EDB32C24 /* Resources */,
+				F7D7245319471AD60DA05205 /* Copy CleanZip Resources */,
 			);
 			buildRules = (
 			);
@@ -160,19 +142,37 @@
 			);
 			name = CleanZipService;
 			productName = CleanZipService;
-			productReference = F62BEA952460599805CA12B0 /* CleanZipService.service */;
+			productReference = 2D6DF54690D5ABB1CF590960 /* CleanZipService.service */;
+			productType = "com.apple.product-type.application";
+		};
+		CDBACBDDD89C3CD077BD5A7A /* CleanZip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3F25ADB24D7E293FA02456B /* Build configuration list for PBXNativeTarget "CleanZip" */;
+			buildPhases = (
+				C56FF3C817C4487C9E0F4542 /* Sources */,
+				70BF9AF1DDE791FAF23A69C7 /* Frameworks */,
+				4796AAFB7CBB56544C4B889E /* Resources */,
+				3F286FA87070B74B4EB7178B /* Copy CleanZip Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CleanZip;
+			productName = CleanZip;
+			productReference = C87D373B3D4CB051FD1232B8 /* CleanZip.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		0B0E4FF1EABDFA4458D08D84 /* Project object */ = {
+		8CEF5B5DF6594B790D17B4E9 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 18B3D2E0A4961F66F56A5107 /* Build configuration list for PBXProject "CleanZip" */;
+			buildConfigurationList = 6C2E9970247A2A48743D1938 /* Build configuration list for PBXProject "CleanZip" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -180,42 +180,42 @@
 				en,
 				Base,
 			);
-			mainGroup = A2A494A088DF05A79DCD4D62;
+			mainGroup = 5D11479D1CA65D8E4BCCA15C;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = C1B3426564E12657516FB7E5 /* Products */;
+			productRefGroup = EA99DEB5793E991FD8DD2C02 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				426B4E720456AAC5C7699E6D /* CleanZip */,
-				AE06E16A68F164145408F981 /* CleanZipService */,
+				CDBACBDDD89C3CD077BD5A7A /* CleanZip */,
+				47F372505E84F2CDE3A8228E /* CleanZipService */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		49432F200CF1312DB7EC4204 /* Resources */ = {
+		099B8B57123C0C22EDB32C24 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3E66C454FED9B147BB232A51 /* Assets.xcassets in Resources */,
-				43FD213F0B3D5B37D5D72400 /* AppIcon.icon in Resources */,
+				0BD2C4DE9E402385698C783B /* Assets.xcassets in Resources */,
+				726D9D08C09C22B554DCF831 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B0E35CD94EB96B1071F84306 /* Resources */ = {
+		4796AAFB7CBB56544C4B889E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				80BDB89F607C1DDB5823DD0D /* Assets.xcassets in Resources */,
-				F5111089C916D7CC32C2C143 /* AppIcon.icon in Resources */,
+				0FC4B6ED47B560EAA5CC7142 /* Assets.xcassets in Resources */,
+				4B6688D7534B62D12DAA7805 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		4B991B97767AB639D6CBA0C5 /* Copy CleanZip Resources */ = {
+		3F286FA87070B74B4EB7178B /* Copy CleanZip Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -233,7 +233,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -euo pipefail\n\nresources_source=\"$SRCROOT/src/Resources\"\nresources_destination=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\nif [[ -d \"$resources_source\" ]]; then\n  rsync -a \"$resources_source/\" \"$resources_destination/\"\nfi\n\nif [[ -d \"$SRCROOT/AppIcon.icon\" ]]; then\n  rm -rf \"$resources_destination/AppIcon.icon\"\n  ditto \"$SRCROOT/AppIcon.icon\" \"$resources_destination/AppIcon.icon\"\nfi\n\nif [[ -x \"$resources_destination/7zz\" ]]; then\n  chmod +x \"$resources_destination/7zz\"\nfi\n";
 		};
-		D274EAA5A059419933A04B23 /* Copy CleanZip Resources */ = {
+		F7D7245319471AD60DA05205 /* Copy CleanZip Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -254,26 +254,26 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		4F74650C767120F10C4653A8 /* Sources */ = {
+		433E365629BBB9C696AAA41F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				67BE48B0AC03E1C29618EAAF /* main.swift in Sources */,
+				AC04038C3012111273B1D09F /* service.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BC6FBE2923052E71A8C3FC62 /* Sources */ = {
+		C56FF3C817C4487C9E0F4542 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				57D7315CD2F0C93A27D6B2AB /* service.swift in Sources */,
+				D7AFCD49BF3A030278A4AA01 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		066E8482D279EF12CAE3DE11 /* Release */ = {
+		0BACE07B003AA03C3CB85571 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = (
@@ -289,6 +289,73 @@
 				COPY_PHASE_STRIP = YES;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
+				PRODUCT_NAME = CleanZipService;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = service;
+			};
+			name = Release;
+		};
+		17BFCE251ED71224AE2CA6BA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
+				PRODUCT_NAME = CleanZipService;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = service;
+			};
+			name = Debug;
+		};
+		4E7F3E047FFAF8C5CCA67C94 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "src/CleanZip-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -296,73 +363,17 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip;
 				PRODUCT_NAME = CleanZip;
 				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				WRAPPER_EXTENSION = app;
 			};
-			name = Release;
+			name = Debug;
 		};
-		35DB19B8B84DCFB0E3D58B8A /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		4DF2B678C237D1DFBC75BA2E /* Debug */ = {
+		63FA82EE4E4B200FA28803B9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -425,39 +436,63 @@
 			};
 			name = Debug;
 		};
-		9F6BA1C1C08469F5A655B42D /* Debug */ = {
+		64CF6DDFA4C04CFDC401E332 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					arm64,
-					x86_64,
-				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
-				PRODUCT_NAME = CleanZipService;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
-				WRAPPER_EXTENSION = service;
 			};
-			name = Debug;
+			name = Release;
 		};
-		BF0BA6B366D50FD532340FB9 /* Release */ = {
+		8FDE65140FB0278F09A35E69 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = (
@@ -473,39 +508,6 @@
 				COPY_PHASE_STRIP = YES;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
-				PRODUCT_NAME = CleanZipService;
-				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-				WRAPPER_EXTENSION = service;
-			};
-			name = Release;
-		};
-		DCE345C4C1D65C10FF0C0F8D /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = (
-					arm64,
-					x86_64,
-				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = NO;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "src/CleanZip-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -513,46 +515,48 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = NO;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip;
 				PRODUCT_NAME = CleanZip;
 				SDKROOT = macosx;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				WRAPPER_EXTENSION = app;
 			};
-			name = Debug;
+			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		014A685E7483268470808D69 /* Build configuration list for PBXNativeTarget "CleanZip" */ = {
+		6C2E9970247A2A48743D1938 /* Build configuration list for PBXProject "CleanZip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				066E8482D279EF12CAE3DE11 /* Release */,
-				DCE345C4C1D65C10FF0C0F8D /* Debug */,
+				63FA82EE4E4B200FA28803B9 /* Debug */,
+				64CF6DDFA4C04CFDC401E332 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		18B3D2E0A4961F66F56A5107 /* Build configuration list for PBXProject "CleanZip" */ = {
+		C76A259C390657C6FADA4D98 /* Build configuration list for PBXNativeTarget "CleanZipService" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				4DF2B678C237D1DFBC75BA2E /* Debug */,
-				35DB19B8B84DCFB0E3D58B8A /* Release */,
+				0BACE07B003AA03C3CB85571 /* Release */,
+				17BFCE251ED71224AE2CA6BA /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7F6E375266E7B614C84FADD3 /* Build configuration list for PBXNativeTarget "CleanZipService" */ = {
+		F3F25ADB24D7E293FA02456B /* Build configuration list for PBXNativeTarget "CleanZip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BF0BA6B366D50FD532340FB9 /* Release */,
-				9F6BA1C1C08469F5A655B42D /* Debug */,
+				8FDE65140FB0278F09A35E69 /* Release */,
+				4E7F3E047FFAF8C5CCA67C94 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 0B0E4FF1EABDFA4458D08D84 /* Project object */;
+	rootObject = 8CEF5B5DF6594B790D17B4E9 /* Project object */;
 }

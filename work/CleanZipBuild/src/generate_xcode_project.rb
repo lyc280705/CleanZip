@@ -48,6 +48,7 @@ def configure_target(target, info_plist, bundle_id, executable_name, product_nam
     config.build_settings["LD_RUNPATH_SEARCH_PATHS"] = "$(inherited) @executable_path/../Frameworks"
     config.build_settings["MACOSX_DEPLOYMENT_TARGET"] = "14.0"
     config.build_settings["ONLY_ACTIVE_ARCH"] = "NO"
+    config.build_settings["OTHER_SWIFT_FLAGS"] = "$(inherited) -parse-as-library"
     config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = bundle_id
     config.build_settings["PRODUCT_NAME"] = product_name
     config.build_settings["SDKROOT"] = "macosx"
