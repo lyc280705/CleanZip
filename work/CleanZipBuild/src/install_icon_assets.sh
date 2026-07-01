@@ -36,8 +36,12 @@ codesign --force --deep --sign - "$HOME/Library/Services/CleanZipService.service
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$HOME/Library/Services/CleanZipService.service"
 /System/Library/CoreServices/pbs -flush 2>/dev/null || true
 qlmanage -r cache >/dev/null 2>&1 || true
-killall Finder 2>/dev/null || true
-killall Dock 2>/dev/null || true
+if [[ "${CLEANZIP_RESTART_FINDER:-0}" == "1" ]]; then
+  killall Finder 2>/dev/null || true
+fi
+if [[ "${CLEANZIP_RESTART_DOCK:-0}" == "1" ]]; then
+  killall Dock 2>/dev/null || true
+fi
 
 if [[ -f "$HOME/Applications/CleanZip.app/Contents/Resources/Assets.car" ]]; then
   echo "Installed dynamic Liquid Glass Assets.car for CleanZip."

@@ -73,7 +73,5 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSUserNotificationAlertStyle</key>
-	<string>banner</string>
 </dict>
 </plist>

@@ -44,7 +44,9 @@ fi
 
 /System/Library/CoreServices/pbs -flush >/dev/null 2>&1 || true
 qlmanage -r cache >/dev/null 2>&1 || true
-killall Finder >/dev/null 2>&1 || true
+if [[ "${CLEANZIP_RESTART_FINDER:-0}" == "1" ]]; then
+  killall Finder >/dev/null 2>&1 || true
+fi
 
 exit 0
 SCRIPT
