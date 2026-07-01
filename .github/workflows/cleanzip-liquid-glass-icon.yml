@@ -1,26 +1,43 @@
-name: Build CleanZip Liquid Glass Icon
+name: Build CleanZip Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to update"
+        required: true
+        default: "v2.6.30"
+      upload_release:
+        description: "Upload pkg, zip, and checksums to the release"
+        required: true
+        type: boolean
+        default: false
   push:
     paths:
       - ".github/workflows/cleanzip-liquid-glass-icon.yml"
       - "README.md"
       - "LICENSE"
+      - "work/CleanZipBuild/CleanZip.xcodeproj/**"
+      - "work/CleanZipBuild/AppIcon.icon/**"
+      - "work/CleanZipBuild/Assets.xcassets/**"
       - "work/CleanZipBuild/src/main.swift"
       - "work/CleanZipBuild/src/service.swift"
       - "work/CleanZipBuild/src/build.sh"
+      - "work/CleanZipBuild/src/build_xcode.sh"
       - "work/CleanZipBuild/src/package.sh"
+      - "work/CleanZipBuild/src/*Info.plist"
       - "work/CleanZipBuild/src/Resources/**"
       - "work/CleanZipBuild/src/generate_filled_icon.py"
+      - "work/CleanZipBuild/src/generate_xcode_project.rb"
       - "work/CleanZipBuild/src/install_icon_assets.sh"
       - "work/CleanZipBuild/assets/CleanZipIcon.original.icns"
-      - "work/CleanZipBuild/CleanZip.app/**"
-      - "work/CleanZipBuild/CleanZipService.service/**"
+
+permissions:
+  contents: write
 
 jobs:
-  icon:
-    name: Compile AppIcon.icon to Assets.car
+  release:
+    name: Build universal app, icon assets, and package
     runs-on: macos-26
     timeout-minutes: 20
 
@@ -52,7 +69,23 @@ jobs:
 
       - name: Build app and Finder service from source
         shell: bash
-        run: work/CleanZipBuild/src/build.sh
+        run: work/CleanZipBuild/src/build_xcode.sh
+
+      - name: Verify universal binary slices
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in \
+            work/CleanZipBuild/CleanZip.app/Contents/MacOS/CleanZip \
+            work/CleanZipBuild/CleanZipService.service/Contents/MacOS/CleanZipService \
+            work/CleanZipBuild/CleanZip.app/Contents/Resources/7zz \
+            work/CleanZipBuild/CleanZipService.service/Contents/Resources/7zz
+          do
+            archs="$(lipo -archs "$binary")"
+            echo "$binary: $archs"
+            [[ "$archs" == *"arm64"* ]]
+            [[ "$archs" == *"x86_64"* ]]
+          done
 
       - name: Generate vector Icon Composer document and compile dynamic assets
         shell: bash
@@ -95,13 +128,31 @@ jobs:
         shell: bash
         run: work/CleanZipBuild/src/package.sh
 
+      - name: Upload package assets to release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="$(find work/CleanZipBuild/dist -maxdepth 1 -name 'CleanZip-*.pkg' -print | sort | tail -n 1)"
+          zip="$(find work/CleanZipBuild/dist -maxdepth 1 -name 'CleanZip-*.zip' -print | sort | tail -n 1)"
+          sums="work/CleanZipBuild/dist/SHA256SUMS.txt"
+          test -f "$pkg"
+          test -f "$zip"
+          test -f "$sums"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          gh release upload "$RELEASE_TAG" "$pkg" "$zip" "$sums" --clobber --repo "$GITHUB_REPOSITORY"
+
       - name: Upload CleanZip build with dynamic icon
         uses: actions/upload-artifact@v4
         with:
-          name: CleanZip-liquid-glass-icon
+          name: CleanZip-release-build
           path: |
             work/CleanZipBuild/CleanZip.app
             work/CleanZipBuild/CleanZipService.service
+            work/CleanZipBuild/CleanZip.xcodeproj
             work/CleanZipBuild/AppIcon.icon
             work/CleanZipBuild/AppIconVariants
             work/CleanZipBuild/dist

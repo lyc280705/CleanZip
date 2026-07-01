@@ -142,33 +142,46 @@ CleanZip runs locally on your Mac. Archive operations are performed with local s
 
 - `work/CleanZipBuild/src/main.swift`: main AppKit/SwiftUI app.
 - `work/CleanZipBuild/src/service.swift`: Finder service helper.
+- `work/CleanZipBuild/CleanZip.xcodeproj`: canonical Xcode project used for release builds.
+- `work/CleanZipBuild/AppIcon.icon`: Icon Composer source for the Liquid Glass app icon.
+- `work/CleanZipBuild/Assets.xcassets`: static fallback app icon catalog.
+- `work/CleanZipBuild/src/CleanZip-Info.plist`: app bundle metadata, document types, and archive UTIs.
+- `work/CleanZipBuild/src/CleanZipService-Info.plist`: Finder service bundle metadata.
 - `work/CleanZipBuild/src/Resources/*.lproj`: localized app, service, and Info.plist resources.
-- `work/CleanZipBuild/src/build.sh`: local Swift build script.
+- `work/CleanZipBuild/src/build_xcode.sh`: Xcode release build script for the app and Finder service.
+- `work/CleanZipBuild/src/build.sh`: lightweight local Swift build fallback for Macs without full Xcode.
 - `work/CleanZipBuild/src/package.sh`: package and ZIP release artifact script.
 - `work/CleanZipBuild/src/generate_filled_icon.py`: vector icon generator and `Assets.car` compiler when Xcode `actool` is available.
-- `.github/workflows/cleanzip-liquid-glass-icon.yml`: macOS 26 GitHub Actions build that compiles the dynamic icon stack and release package.
+- `.github/workflows/cleanzip-liquid-glass-icon.yml`: macOS 26 GitHub Actions release build that uses full Xcode, compiles the dynamic icon stack, packages CleanZip, and can update release assets.
 
 ## Build From Source
 
-Local build with Command Line Tools:
+Recommended release build with full Xcode:
 
 ```sh
-work/CleanZipBuild/src/build.sh
+work/CleanZipBuild/src/build_xcode.sh
+work/CleanZipBuild/src/package.sh
 ```
 
-Dynamic Liquid Glass icon compilation requires Xcode 26 `actool`. If full Xcode is not installed locally, run the GitHub Actions workflow:
+If full Xcode is not installed locally, use GitHub Actions. The workflow builds the Xcode project on a macOS runner with Xcode, verifies Intel and Apple Silicon slices, compiles the Icon Composer document, creates the installer, and uploads build artifacts:
 
 ```sh
 gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main
 ```
 
-Create release artifacts after building:
+To rebuild and update an existing GitHub release asset set:
 
 ```sh
-work/CleanZipBuild/src/package.sh
+gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main -f release_tag=v2.6.30 -f upload_release=true
 ```
 
-The workflow uploads `CleanZip.app`, `CleanZipService.service`, the vector `AppIcon.icon` document, release packages, and an `Assets.car` inspection report.
+Lightweight local fallback with Command Line Tools:
+
+```sh
+work/CleanZipBuild/src/build.sh
+```
+
+Dynamic Liquid Glass icon compilation requires Xcode 26 `actool`. The lightweight fallback still creates a usable app bundle, but the GitHub Actions/Xcode path is the canonical release path.
 
 ## License
 

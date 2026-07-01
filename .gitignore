@@ -1,6 +1,8 @@
 .DS_Store
 *.xcuserstate
 *.swp
+work/CleanZipBuild/build/
+work/CleanZipBuild/dist/
 
 work/CleanZipBuild/CleanZip.app/Contents/_CodeSignature/
 work/CleanZipBuild/CleanZipService.service/Contents/_CodeSignature/

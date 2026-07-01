@@ -11,7 +11,7 @@ SCRIPTS_DIR="$DIST/scripts"
 export COPYFILE_DISABLE=1
 
 if [[ ! -d "$APP" || ! -d "$SERVICE" ]]; then
-  echo "CleanZip.app or CleanZipService.service is missing. Run src/build.sh first." >&2
+  echo "CleanZip.app or CleanZipService.service is missing. Run src/build_xcode.sh or src/build.sh first." >&2
   exit 2
 fi
 
