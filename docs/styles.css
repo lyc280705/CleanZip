@@ -304,8 +304,7 @@ figure img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 8px;
-  box-shadow: 0 14px 38px rgba(26, 47, 52, 0.12);
+  border-radius: 0;
 }
 
 figcaption {
