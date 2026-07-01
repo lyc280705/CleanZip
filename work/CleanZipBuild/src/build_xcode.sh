@@ -33,8 +33,8 @@ common_settings=(
   ONLY_ACTIVE_ARCH=NO
 )
 
-xcodebuild "${common_settings[@]}" -target CleanZip build
-xcodebuild "${common_settings[@]}" -target CleanZipService build
+xcodebuild "${common_settings[@]}" -scheme CleanZip build
+xcodebuild "${common_settings[@]}" -scheme CleanZipService build
 
 if [[ ! -d "$PRODUCTS/CleanZip.app" ]]; then
   echo "Xcode did not produce $PRODUCTS/CleanZip.app" >&2

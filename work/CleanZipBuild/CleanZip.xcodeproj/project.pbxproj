@@ -7,134 +7,134 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4363EA7CD9D4FAAF5ADD850B /* service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02483562066B62AD21ADADC2 /* service.swift */; };
-		6B11814F23D5A42B3E8C0731 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED1C9CDEBB56EC5A94D0AEBE /* Cocoa.framework */; };
-		7A59AD7DCD446DCC3C59C381 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3C9FEA600D7624A1335BBAF0 /* Assets.xcassets */; };
-		7DA250BB86434787374E7E40 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0CBB4371668B583E6882FD43 /* AppIcon.icon */; };
-		D776BFB2045F4311DE9E3F6B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ED1C9CDEBB56EC5A94D0AEBE /* Cocoa.framework */; };
-		E52A309DB972EE723D372EF3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3C9FEA600D7624A1335BBAF0 /* Assets.xcassets */; };
-		E8009E0A8C4FF9051930E287 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC3F58F8128933654F218FCC /* main.swift */; };
-		ED472302748D2D567F8802E8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0CBB4371668B583E6882FD43 /* AppIcon.icon */; };
+		1BB8FAB1E550939EDFE13E0D /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2162961B7680E20E04C9A0D /* Cocoa.framework */; };
+		3E66C454FED9B147BB232A51 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */; };
+		43FD213F0B3D5B37D5D72400 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D11A5528F00BF39DE67A875 /* AppIcon.icon */; };
+		57D7315CD2F0C93A27D6B2AB /* service.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B571B3055BE111C95358C38 /* service.swift */; };
+		67BE48B0AC03E1C29618EAAF /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF32F5E94F385DDE13F8622A /* main.swift */; };
+		80BDB89F607C1DDB5823DD0D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */; };
+		E9CD5FC88887CEF99A063D9D /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2162961B7680E20E04C9A0D /* Cocoa.framework */; };
+		F5111089C916D7CC32C2C143 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D11A5528F00BF39DE67A875 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		02483562066B62AD21ADADC2 /* service.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = service.swift; sourceTree = "<group>"; };
-		0461F5F4A8976D647E3CB94F /* 7-Zip-readme.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-readme.txt"; sourceTree = "<group>"; };
-		0CBB4371668B583E6882FD43 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
-		3C9FEA600D7624A1335BBAF0 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		72BEFA34968D1D27AA48F7E4 /* CleanZip-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZip-Info.plist"; sourceTree = "<group>"; };
-		7CEEE1EB899546D793803CC0 /* CleanZipService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZipService-Info.plist"; sourceTree = "<group>"; };
-		B28CFCAD0C6324CAEDFB06B9 /* CleanZipIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = CleanZipIcon.icns; sourceTree = "<group>"; };
-		CC3F58F8128933654F218FCC /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		DF1B5862E1B9EE9694BBD442 /* CleanZipService.service */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZipService.service; path = CleanZipService.service; sourceTree = BUILT_PRODUCTS_DIR; };
-		EAB54EB09945783AFA3B7813 /* AppIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = AppIcon.icns; sourceTree = "<group>"; };
-		EAF67630020E73FDEC0A9D75 /* 7zz */ = {isa = PBXFileReference; includeInIndex = 1; path = 7zz; sourceTree = "<group>"; };
-		ED1C9CDEBB56EC5A94D0AEBE /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		F3D9891358F0FEE92AF08143 /* 7-Zip-License.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-License.txt"; sourceTree = "<group>"; };
-		FD22205A8623CE2AC7A8544E /* CleanZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZip.app; path = CleanZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		120A1E651DC2DDBF1A41ABDC /* CleanZip-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZip-Info.plist"; sourceTree = "<group>"; };
+		2D11A5528F00BF39DE67A875 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		2F59546ACFBDC3576A7F3E01 /* CleanZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZip.app; path = CleanZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		31663EA5B67083822C103A75 /* CleanZipIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = CleanZipIcon.icns; sourceTree = "<group>"; };
+		5381B883428637F8BDCCD60A /* CleanZipService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZipService-Info.plist"; sourceTree = "<group>"; };
+		574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		6D41881515334903B82F091B /* 7zz */ = {isa = PBXFileReference; includeInIndex = 1; path = 7zz; sourceTree = "<group>"; };
+		7B5EC6ACEEF009BB645930BE /* 7-Zip-readme.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-readme.txt"; sourceTree = "<group>"; };
+		9B571B3055BE111C95358C38 /* service.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = service.swift; sourceTree = "<group>"; };
+		A86BA3BE400A582927A4EEC6 /* AppIcon.icns */ = {isa = PBXFileReference; includeInIndex = 1; path = AppIcon.icns; sourceTree = "<group>"; };
+		B2845280F3FDF22B92B0A083 /* 7-Zip-License.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-License.txt"; sourceTree = "<group>"; };
+		CF32F5E94F385DDE13F8622A /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		E2162961B7680E20E04C9A0D /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		F62BEA952460599805CA12B0 /* CleanZipService.service */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZipService.service; path = CleanZipService.service; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		8EC0AE23C61FB47802AD1709 /* Frameworks */ = {
+		21921A5E15B13D90CE941259 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6B11814F23D5A42B3E8C0731 /* Cocoa.framework in Frameworks */,
+				1BB8FAB1E550939EDFE13E0D /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B3FCE431A7CDB4750EEC7190 /* Frameworks */ = {
+		42F44F424C63FB01C97DB040 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D776BFB2045F4311DE9E3F6B /* Cocoa.framework in Frameworks */,
+				E9CD5FC88887CEF99A063D9D /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		466418C834E2691B2ADD3874 /* OS X */ = {
+		94FD87E374AD7E020885B767 /* src */ = {
 			isa = PBXGroup;
 			children = (
-				ED1C9CDEBB56EC5A94D0AEBE /* Cocoa.framework */,
-			);
-			name = "OS X";
-			sourceTree = "<group>";
-		};
-		4B48C982FCFC7F3582A598D0 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				EAF67630020E73FDEC0A9D75 /* 7zz */,
-				F3D9891358F0FEE92AF08143 /* 7-Zip-License.txt */,
-				0461F5F4A8976D647E3CB94F /* 7-Zip-readme.txt */,
-				EAB54EB09945783AFA3B7813 /* AppIcon.icns */,
-				B28CFCAD0C6324CAEDFB06B9 /* CleanZipIcon.icns */,
-			);
-			name = Resources;
-			path = src/Resources;
-			sourceTree = "<group>";
-		};
-		721760A936013E5809EF1D54 /* Icon */ = {
-			isa = PBXGroup;
-			children = (
-				0CBB4371668B583E6882FD43 /* AppIcon.icon */,
-			);
-			name = Icon;
-			sourceTree = "<group>";
-		};
-		AEDCF923450DE977863EF272 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				466418C834E2691B2ADD3874 /* OS X */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		B6731422340E47AEBF59AB82 /* src */ = {
-			isa = PBXGroup;
-			children = (
-				4B48C982FCFC7F3582A598D0 /* Resources */,
-				CC3F58F8128933654F218FCC /* main.swift */,
-				02483562066B62AD21ADADC2 /* service.swift */,
-				72BEFA34968D1D27AA48F7E4 /* CleanZip-Info.plist */,
-				7CEEE1EB899546D793803CC0 /* CleanZipService-Info.plist */,
+				D863579008C0B8F877050801 /* Resources */,
+				CF32F5E94F385DDE13F8622A /* main.swift */,
+				9B571B3055BE111C95358C38 /* service.swift */,
+				120A1E651DC2DDBF1A41ABDC /* CleanZip-Info.plist */,
+				5381B883428637F8BDCCD60A /* CleanZipService-Info.plist */,
 			);
 			name = src;
 			path = src;
 			sourceTree = "<group>";
 		};
-		E6CEB2E54A5C32883096BCCE /* Products */ = {
+		9BB73B72306D0005A362512B /* OS X */ = {
 			isa = PBXGroup;
 			children = (
-				FD22205A8623CE2AC7A8544E /* CleanZip.app */,
-				DF1B5862E1B9EE9694BBD442 /* CleanZipService.service */,
+				E2162961B7680E20E04C9A0D /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
+		A2A494A088DF05A79DCD4D62 = {
+			isa = PBXGroup;
+			children = (
+				C1B3426564E12657516FB7E5 /* Products */,
+				BD6A861597D362785EEDB206 /* Frameworks */,
+				94FD87E374AD7E020885B767 /* src */,
+				FEB78E1EF80DE9997B1FA3E7 /* Icon */,
+				574893C1F87C4C7ACFAADFF7 /* Assets.xcassets */,
+			);
+			sourceTree = "<group>";
+		};
+		BD6A861597D362785EEDB206 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9BB73B72306D0005A362512B /* OS X */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C1B3426564E12657516FB7E5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2F59546ACFBDC3576A7F3E01 /* CleanZip.app */,
+				F62BEA952460599805CA12B0 /* CleanZipService.service */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		EBC4700A03AED0E1886359E5 = {
+		D863579008C0B8F877050801 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				E6CEB2E54A5C32883096BCCE /* Products */,
-				AEDCF923450DE977863EF272 /* Frameworks */,
-				B6731422340E47AEBF59AB82 /* src */,
-				721760A936013E5809EF1D54 /* Icon */,
-				3C9FEA600D7624A1335BBAF0 /* Assets.xcassets */,
+				6D41881515334903B82F091B /* 7zz */,
+				B2845280F3FDF22B92B0A083 /* 7-Zip-License.txt */,
+				7B5EC6ACEEF009BB645930BE /* 7-Zip-readme.txt */,
+				A86BA3BE400A582927A4EEC6 /* AppIcon.icns */,
+				31663EA5B67083822C103A75 /* CleanZipIcon.icns */,
 			);
+			name = Resources;
+			path = src/Resources;
+			sourceTree = "<group>";
+		};
+		FEB78E1EF80DE9997B1FA3E7 /* Icon */ = {
+			isa = PBXGroup;
+			children = (
+				2D11A5528F00BF39DE67A875 /* AppIcon.icon */,
+			);
+			name = Icon;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		01BE4A0B7E2293F7B20695B3 /* CleanZip */ = {
+		426B4E720456AAC5C7699E6D /* CleanZip */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = BF45E95A54C1CBA0CF6B1EA9 /* Build configuration list for PBXNativeTarget "CleanZip" */;
+			buildConfigurationList = 014A685E7483268470808D69 /* Build configuration list for PBXNativeTarget "CleanZip" */;
 			buildPhases = (
-				77FEEF03A38B0616868EB1EC /* Sources */,
-				B3FCE431A7CDB4750EEC7190 /* Frameworks */,
-				5B2C0CDD99006052F1C57F91 /* Resources */,
-				17BAA0A4446B6D9880E31D4D /* Copy CleanZip Resources */,
+				4F74650C767120F10C4653A8 /* Sources */,
+				42F44F424C63FB01C97DB040 /* Frameworks */,
+				B0E35CD94EB96B1071F84306 /* Resources */,
+				4B991B97767AB639D6CBA0C5 /* Copy CleanZip Resources */,
 			);
 			buildRules = (
 			);
@@ -142,17 +142,17 @@
 			);
 			name = CleanZip;
 			productName = CleanZip;
-			productReference = FD22205A8623CE2AC7A8544E /* CleanZip.app */;
+			productReference = 2F59546ACFBDC3576A7F3E01 /* CleanZip.app */;
 			productType = "com.apple.product-type.application";
 		};
-		48E1AA23A8FA8C5F298F1522 /* CleanZipService */ = {
+		AE06E16A68F164145408F981 /* CleanZipService */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E33B18E63CE4678DB66D65DC /* Build configuration list for PBXNativeTarget "CleanZipService" */;
+			buildConfigurationList = 7F6E375266E7B614C84FADD3 /* Build configuration list for PBXNativeTarget "CleanZipService" */;
 			buildPhases = (
-				FF63495B2A3DD247AE46A0CA /* Sources */,
-				8EC0AE23C61FB47802AD1709 /* Frameworks */,
-				8DB4C8E44F85F63DB20864C3 /* Resources */,
-				0C76F70DC8DD40AE41AD9BE5 /* Copy CleanZip Resources */,
+				BC6FBE2923052E71A8C3FC62 /* Sources */,
+				21921A5E15B13D90CE941259 /* Frameworks */,
+				49432F200CF1312DB7EC4204 /* Resources */,
+				D274EAA5A059419933A04B23 /* Copy CleanZip Resources */,
 			);
 			buildRules = (
 			);
@@ -160,19 +160,19 @@
 			);
 			name = CleanZipService;
 			productName = CleanZipService;
-			productReference = DF1B5862E1B9EE9694BBD442 /* CleanZipService.service */;
+			productReference = F62BEA952460599805CA12B0 /* CleanZipService.service */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		19DF3F14BCF9FCCA05A1D688 /* Project object */ = {
+		0B0E4FF1EABDFA4458D08D84 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 9CC484453970AB3AA3FECF7F /* Build configuration list for PBXProject "CleanZip" */;
+			buildConfigurationList = 18B3D2E0A4961F66F56A5107 /* Build configuration list for PBXProject "CleanZip" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -180,42 +180,42 @@
 				en,
 				Base,
 			);
-			mainGroup = EBC4700A03AED0E1886359E5;
+			mainGroup = A2A494A088DF05A79DCD4D62;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = E6CEB2E54A5C32883096BCCE /* Products */;
+			productRefGroup = C1B3426564E12657516FB7E5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				01BE4A0B7E2293F7B20695B3 /* CleanZip */,
-				48E1AA23A8FA8C5F298F1522 /* CleanZipService */,
+				426B4E720456AAC5C7699E6D /* CleanZip */,
+				AE06E16A68F164145408F981 /* CleanZipService */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		5B2C0CDD99006052F1C57F91 /* Resources */ = {
+		49432F200CF1312DB7EC4204 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E52A309DB972EE723D372EF3 /* Assets.xcassets in Resources */,
-				ED472302748D2D567F8802E8 /* AppIcon.icon in Resources */,
+				3E66C454FED9B147BB232A51 /* Assets.xcassets in Resources */,
+				43FD213F0B3D5B37D5D72400 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8DB4C8E44F85F63DB20864C3 /* Resources */ = {
+		B0E35CD94EB96B1071F84306 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A59AD7DCD446DCC3C59C381 /* Assets.xcassets in Resources */,
-				7DA250BB86434787374E7E40 /* AppIcon.icon in Resources */,
+				80BDB89F607C1DDB5823DD0D /* Assets.xcassets in Resources */,
+				F5111089C916D7CC32C2C143 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		0C76F70DC8DD40AE41AD9BE5 /* Copy CleanZip Resources */ = {
+		4B991B97767AB639D6CBA0C5 /* Copy CleanZip Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -233,7 +233,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -euo pipefail\n\nresources_source=\"$SRCROOT/src/Resources\"\nresources_destination=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\nif [[ -d \"$resources_source\" ]]; then\n  rsync -a \"$resources_source/\" \"$resources_destination/\"\nfi\n\nif [[ -d \"$SRCROOT/AppIcon.icon\" ]]; then\n  rm -rf \"$resources_destination/AppIcon.icon\"\n  ditto \"$SRCROOT/AppIcon.icon\" \"$resources_destination/AppIcon.icon\"\nfi\n\nif [[ -x \"$resources_destination/7zz\" ]]; then\n  chmod +x \"$resources_destination/7zz\"\nfi\n";
 		};
-		17BAA0A4446B6D9880E31D4D /* Copy CleanZip Resources */ = {
+		D274EAA5A059419933A04B23 /* Copy CleanZip Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -254,26 +254,26 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		77FEEF03A38B0616868EB1EC /* Sources */ = {
+		4F74650C767120F10C4653A8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E8009E0A8C4FF9051930E287 /* main.swift in Sources */,
+				67BE48B0AC03E1C29618EAAF /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		FF63495B2A3DD247AE46A0CA /* Sources */ = {
+		BC6FBE2923052E71A8C3FC62 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4363EA7CD9D4FAAF5ADD850B /* service.swift in Sources */,
+				57D7315CD2F0C93A27D6B2AB /* service.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		30F20844475B55503E5753EC /* Release */ = {
+		066E8482D279EF12CAE3DE11 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = (
@@ -306,40 +306,63 @@
 			};
 			name = Release;
 		};
-		77A91C01CD3295C1A76F99D6 /* Release */ = {
+		35DB19B8B84DCFB0E3D58B8A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = (
-					arm64,
-					x86_64,
-				);
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
-				COMBINE_HIDPI_IMAGES = YES;
-				COPY_PHASE_STRIP = YES;
-				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
-				PRODUCT_NAME = CleanZipService;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
-				WRAPPER_EXTENSION = service;
 			};
 			name = Release;
 		};
-		ADDB5EBB276A1694BB70C236 /* Debug */ = {
+		4DF2B678C237D1DFBC75BA2E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -402,7 +425,7 @@
 			};
 			name = Debug;
 		};
-		B3A173A8BBD25886836DB4EA /* Debug */ = {
+		9F6BA1C1C08469F5A655B42D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = (
@@ -434,63 +457,40 @@
 			};
 			name = Debug;
 		};
-		C27857B161CFDAADB6DEC785 /* Release */ = {
+		BF0BA6B366D50FD532340FB9 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "src/CleanZipService-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = local.codex.cleanzip.service;
+				PRODUCT_NAME = CleanZipService;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+				WRAPPER_EXTENSION = service;
 			};
 			name = Release;
 		};
-		F35F3EB542DACB9B4C63836F /* Debug */ = {
+		DCE345C4C1D65C10FF0C0F8D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = (
@@ -525,34 +525,34 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		9CC484453970AB3AA3FECF7F /* Build configuration list for PBXProject "CleanZip" */ = {
+		014A685E7483268470808D69 /* Build configuration list for PBXNativeTarget "CleanZip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				ADDB5EBB276A1694BB70C236 /* Debug */,
-				C27857B161CFDAADB6DEC785 /* Release */,
+				066E8482D279EF12CAE3DE11 /* Release */,
+				DCE345C4C1D65C10FF0C0F8D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BF45E95A54C1CBA0CF6B1EA9 /* Build configuration list for PBXNativeTarget "CleanZip" */ = {
+		18B3D2E0A4961F66F56A5107 /* Build configuration list for PBXProject "CleanZip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				30F20844475B55503E5753EC /* Release */,
-				F35F3EB542DACB9B4C63836F /* Debug */,
+				4DF2B678C237D1DFBC75BA2E /* Debug */,
+				35DB19B8B84DCFB0E3D58B8A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E33B18E63CE4678DB66D65DC /* Build configuration list for PBXNativeTarget "CleanZipService" */ = {
+		7F6E375266E7B614C84FADD3 /* Build configuration list for PBXNativeTarget "CleanZipService" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				77A91C01CD3295C1A76F99D6 /* Release */,
-				B3A173A8BBD25886836DB4EA /* Debug */,
+				BF0BA6B366D50FD532340FB9 /* Release */,
+				9F6BA1C1C08469F5A655B42D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 19DF3F14BCF9FCCA05A1D688 /* Project object */;
+	rootObject = 0B0E4FF1EABDFA4458D08D84 /* Project object */;
 }

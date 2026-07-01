@@ -125,4 +125,11 @@ project.build_configurations.each do |config|
   config.build_settings["SDKROOT"] = "macosx"
 end
 
+[app_target, service_target].each do |target|
+  scheme = Xcodeproj::XCScheme.new
+  scheme.add_build_target(target)
+  scheme.set_launch_target(target)
+  scheme.save_as(project_path, target.name, true)
+end
+
 project.save
