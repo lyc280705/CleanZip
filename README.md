@@ -26,7 +26,7 @@
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
-CleanZip is built for the everyday archive jobs that should be fast and boring: create ZIP files that do not contain macOS metadata, remove `.DS_Store` noise before sharing, inspect an archive before extracting it, split large archives, and use one clear Finder action instead of a crowded context menu.
+[CleanZip for macOS](https://lyc280705.github.io/CleanZip/) is built for the everyday archive jobs that should be fast and boring: create ZIP files that do not contain macOS metadata, remove `.DS_Store` noise before sharing, inspect an archive before extracting it, split large archives, and use one clear Finder action instead of a crowded context menu.
 
 It is intentionally small: no always-on background app, no history database, no archive editor, and no heavy all-in-one file manager.
 
