@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import QuartzCore
 import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import UserNotifications
@@ -645,6 +646,20 @@ final class VerticalOnlyScrollView: NSScrollView {
     }
 }
 
+struct SystemContentBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .contentBackground
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.state = .followsWindowActiveState
+    }
+}
+
 final class ServiceProgressHUD {
     private var panel: NSPanel?
     private var titleField: NSTextField?
@@ -687,17 +702,27 @@ final class ServiceProgressHUD {
         updateVisibleControls()
 
         guard let panel else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self, weak panel] in
-            panel?.orderOut(nil)
-            self?.panel = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self, weak panel] in
+            guard let panel else { return }
+            self?.hide(panel)
         }
     }
 
     private func showIfNeeded() {
         guard !finished else { return }
+        let created = panel == nil
         if panel == nil { panel = makePanel() }
         updateVisibleControls()
-        panel?.orderFrontRegardless()
+        guard let panel else { return }
+        if created && !shouldReduceMotion {
+            panel.alphaValue = 0
+        }
+        panel.orderFrontRegardless()
+        if created && !shouldReduceMotion {
+            animate(panel, alpha: 1, duration: 0.18)
+        } else {
+            panel.alphaValue = 1
+        }
     }
 
     private func makePanel() -> NSPanel {
@@ -717,6 +742,7 @@ final class ServiceProgressHUD {
         panel.isMovableByWindowBackground = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.alphaValue = shouldReduceMotion ? 1 : 0
 
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
@@ -816,6 +842,32 @@ final class ServiceProgressHUD {
             y: frame.maxY - size.height - 72
         )
         panel.setFrameOrigin(origin)
+    }
+
+    private var shouldReduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    private func hide(_ panel: NSPanel) {
+        if shouldReduceMotion {
+            panel.orderOut(nil)
+            if self.panel === panel { self.panel = nil }
+            return
+        }
+        animate(panel, alpha: 0, duration: 0.16) { [weak self, weak panel] in
+            panel?.orderOut(nil)
+            if let panel, self?.panel === panel { self?.panel = nil }
+        }
+    }
+
+    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: alpha > panel.alphaValue ? .easeOut : .easeIn)
+            panel.animator().alphaValue = alpha
+        } completionHandler: {
+            completion?()
+        }
     }
 
     private var percentText: String {
@@ -988,6 +1040,7 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.autosaveName = "local.codex.cleanzip.archiveEntriesTable"
         table.autosaveTableColumns = true
+        table.backgroundColor = .clear
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
             ("name", L10n.tr("column.name"), 380, 180, 1200),
             ("size", L10n.tr("column.size"), 140, 96, 280),
@@ -1009,6 +1062,7 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
+        scroll.drawsBackground = false
         scroll.contentView = LockedHorizontalClipView()
         scroll.contentView.postsBoundsChangedNotifications = true
         scroll.documentView = table
@@ -1218,6 +1272,7 @@ struct SelectedItemsTable: NSViewRepresentable {
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.autosaveName = "local.codex.cleanzip.selectedItemsTable"
         table.autosaveTableColumns = true
+        table.backgroundColor = .clear
 
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
             ("selectedName", L10n.tr("column.name"), 260, 180, 900),
@@ -1242,6 +1297,7 @@ struct SelectedItemsTable: NSViewRepresentable {
         scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
+        scroll.drawsBackground = false
         scroll.contentView = LockedHorizontalClipView()
         scroll.contentView.postsBoundsChangedNotifications = true
         scroll.documentView = table
@@ -1271,6 +1327,9 @@ struct SelectedItemsTable: NSViewRepresentable {
 
 struct ContentView: View {
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dropIsTargeted = false
+
     private var filteredEntries: [ArchiveEntry] {
         guard !state.searchText.isEmpty else { return state.entries }
         return state.entries.filter { $0.path.localizedCaseInsensitiveContains(state.searchText) }
@@ -1278,14 +1337,46 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            mainContent
+            ZStack {
+                mainContent
+                    .id(contentIdentity)
+                    .transition(contentTransition)
+            }
+            .overlay(alignment: .center) {
+                if dropIsTargeted {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.55), lineWidth: 2)
+                        .padding(10)
+                        .transition(.opacity)
+                        .accessibilityHidden(true)
+                }
+            }
             Divider()
             footer
         }
         .frame(minWidth: 820, minHeight: 560)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onDrop(of: [.fileURL], isTargeted: nil, perform: handleDrop)
+        .background(SystemContentBackground().ignoresSafeArea())
+        .animation(contentAnimation, value: contentIdentity)
+        .animation(contentAnimation, value: dropIsTargeted)
+        .onDrop(of: [.fileURL], isTargeted: $dropIsTargeted, perform: handleDrop)
         .sheet(isPresented: $state.showingCompressSheet) { CompressSheet().environmentObject(state) }
+    }
+
+    private var contentIdentity: String {
+        if state.archiveURL != nil { return "archive" }
+        if !state.selectedURLs.isEmpty { return "selectedItems" }
+        return "empty"
+    }
+
+    private var contentAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.18)
+    }
+
+    private var contentTransition: AnyTransition {
+        reduceMotion ? .opacity : .asymmetric(
+            insertion: .opacity.combined(with: .move(edge: .bottom)),
+            removal: .opacity
+        )
     }
 
     @ViewBuilder
@@ -1300,10 +1391,15 @@ struct ContentView: View {
             } description: {
                 Text(L10n.tr("empty.description"))
             } actions: {
-                HStack {
-                    Button(L10n.tr("button.chooseArchive")) { state.openArchivePanel() }
-                    Button(L10n.tr("button.chooseItems")) { state.openItemsPanel() }
+                HStack(spacing: 12) {
+                    Button { state.openArchivePanel() } label: {
+                        Label(L10n.tr("button.chooseArchive"), systemImage: "doc.zipper")
+                    }
+                    Button { state.openItemsPanel() } label: {
+                        Label(L10n.tr("button.chooseItems"), systemImage: "folder.badge.plus")
+                    }
                 }
+                .controlSize(.large)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1359,6 +1455,7 @@ struct ContentView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(width: 42, alignment: .trailing)
+                    .contentTransition(.numericText())
             }
         }
         .padding(.horizontal, 12)
@@ -1385,6 +1482,8 @@ struct ContentView: View {
 struct CompressSheet: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(L10n.tr("settings.title")).font(.title2.weight(.semibold))
@@ -1401,9 +1500,11 @@ struct CompressSheet: View {
                         TextField(L10n.tr("settings.sizePlaceholder"), text: $state.customSplitMB).textFieldStyle(.roundedBorder).frame(width: 90)
                         Text("MB").foregroundStyle(.secondary)
                     }
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 }
             }
             .formStyle(.grouped)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: state.splitPreset.id)
             Text(L10n.tr("settings.cleanMetadataNote")).foregroundStyle(.secondary).font(.footnote)
             HStack {
                 Spacer()
@@ -1575,7 +1676,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             chooseArchiveItemID,
             chooseItemsItemID,
             extractArchiveItemID,
-            compressSettingsItemID
+            compressSettingsItemID,
+            .space
         ]
     }
 
@@ -1600,6 +1702,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         if showingSelectedItems {
             identifiers.append(compressSettingsItemID)
         }
+        identifiers.append(.space)
         return identifiers
     }
 
