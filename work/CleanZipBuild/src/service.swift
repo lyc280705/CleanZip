@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 @preconcurrency import UserNotifications
 
 enum L10n {
@@ -243,17 +244,27 @@ final class ServiceProgressHUD {
         fraction = 1
         updateVisibleControls()
         guard let panel else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self, weak panel] in
-            panel?.orderOut(nil)
-            self?.panel = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self, weak panel] in
+            guard let panel else { return }
+            self?.hide(panel)
         }
     }
 
     private func showIfNeeded() {
         guard !finished else { return }
+        let created = panel == nil
         if panel == nil { panel = makePanel() }
         updateVisibleControls()
-        panel?.orderFrontRegardless()
+        guard let panel else { return }
+        if created && !shouldReduceMotion {
+            panel.alphaValue = 0
+        }
+        panel.orderFrontRegardless()
+        if created && !shouldReduceMotion {
+            animate(panel, alpha: 1, duration: 0.18)
+        } else {
+            panel.alphaValue = 1
+        }
     }
 
     private func makePanel() -> NSPanel {
@@ -268,6 +279,7 @@ final class ServiceProgressHUD {
         panel.isMovableByWindowBackground = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.alphaValue = shouldReduceMotion ? 1 : 0
 
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
@@ -364,6 +376,32 @@ final class ServiceProgressHUD {
     }
 
     private var percentText: String { "\(Int((fraction * 100).rounded()))%" }
+
+    private var shouldReduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    private func hide(_ panel: NSPanel) {
+        if shouldReduceMotion {
+            panel.orderOut(nil)
+            if self.panel === panel { self.panel = nil }
+            return
+        }
+        animate(panel, alpha: 0, duration: 0.16) { [weak self, weak panel] in
+            panel?.orderOut(nil)
+            if let panel, self?.panel === panel { self?.panel = nil }
+        }
+    }
+
+    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: alpha > panel.alphaValue ? .easeOut : .easeIn)
+            panel.animator().alphaValue = alpha
+        } completionHandler: {
+            completion?()
+        }
+    }
 
     private func updateVisibleControls() {
         titleField?.stringValue = title
