@@ -613,15 +613,17 @@ final class AppState: ObservableObject {
 }
 
 final class FinderTableScrollView: NSScrollView {
-    private var isSnappingColumns = false
+    private var isRebalancingColumns = false
+    private var lastViewportWidth: CGFloat = 0
+    private var columnsWereFitted = true
 
     override func layout() {
         super.layout()
-        snapFirstColumnToViewport()
+        rebalanceColumnsToViewport()
     }
 
-    func snapFirstColumnToViewport() {
-        guard !isSnappingColumns,
+    func rebalanceColumnsToViewport(resizedColumn: NSTableColumn? = nil) {
+        guard !isRebalancingColumns,
               let table = documentView as? NSTableView,
               let firstColumn = table.tableColumns.first,
               table.numberOfColumns > 0 else { return }
@@ -629,11 +631,20 @@ final class FinderTableScrollView: NSScrollView {
         let viewportWidth = floor(contentView.bounds.width)
         let columnsWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
         let gap = viewportWidth - columnsWidth
-        guard gap > 0.5 else { return }
+        let isInitialLayout = lastViewportWidth <= 0
+        let viewportChanged = !isInitialLayout && abs(viewportWidth - lastViewportWidth) > 0.5
+        let nonFirstColumnChanged = resizedColumn != nil && resizedColumn !== firstColumn
+        let shouldRebalance = isInitialLayout || gap > 0.5 || (columnsWereFitted && (viewportChanged || nonFirstColumnChanged))
 
-        isSnappingColumns = true
-        firstColumn.width = min(firstColumn.maxWidth, firstColumn.width + gap)
-        isSnappingColumns = false
+        if shouldRebalance && abs(gap) > 0.5 {
+            isRebalancingColumns = true
+            firstColumn.width = min(firstColumn.maxWidth, max(firstColumn.minWidth, firstColumn.width + gap))
+            isRebalancingColumns = false
+        }
+
+        let fittedWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
+        columnsWereFitted = abs(viewportWidth - fittedWidth) <= 1
+        lastViewportWidth = viewportWidth
     }
 }
 
@@ -972,12 +983,13 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
         func tableViewColumnDidResize(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
         }
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
@@ -1030,7 +1042,7 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         if let table = scrollView.documentView as? NSTableView {
             table.reloadData()
         }
-        (scrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 
@@ -1078,12 +1090,13 @@ struct SelectedItemsTable: NSViewRepresentable {
 
         func tableViewColumnDidResize(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
         }
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
@@ -1224,7 +1237,7 @@ struct SelectedItemsTable: NSViewRepresentable {
             table.reloadData()
             context.coordinator.applySelection(to: table)
         }
-        (scrollView as? FinderTableScrollView)?.snapFirstColumnToViewport()
+        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 
