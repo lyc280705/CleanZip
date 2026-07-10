@@ -612,37 +612,39 @@ final class AppState: ObservableObject {
     }
 }
 
-final class LockedHorizontalClipView: NSClipView {
-    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
-        var bounds = super.constrainBoundsRect(proposedBounds)
-        bounds.origin.x = 0
-        return bounds
+final class FinderTableScrollView: NSScrollView {
+    private var isRebalancingColumns = false
+    private var lastViewportWidth: CGFloat = 0
+    private var columnsWereFitted = true
+
+    override func layout() {
+        super.layout()
+        rebalanceColumnsToViewport()
     }
 
-    override func setBoundsOrigin(_ newOrigin: NSPoint) {
-        super.setBoundsOrigin(NSPoint(x: 0, y: newOrigin.y))
-    }
-}
+    func rebalanceColumnsToViewport(resizedColumn: NSTableColumn? = nil) {
+        guard !isRebalancingColumns,
+              let table = documentView as? NSTableView,
+              let firstColumn = table.tableColumns.first,
+              table.numberOfColumns > 0 else { return }
 
-final class VerticalOnlyScrollView: NSScrollView {
-    override func scrollWheel(with event: NSEvent) {
-        super.scrollWheel(with: event)
-        lockHorizontalOrigin()
-    }
+        let viewportWidth = floor(contentView.bounds.width)
+        let columnsWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
+        let gap = viewportWidth - columnsWidth
+        let isInitialLayout = lastViewportWidth <= 0
+        let viewportChanged = !isInitialLayout && abs(viewportWidth - lastViewportWidth) > 0.5
+        let nonFirstColumnChanged = resizedColumn != nil && resizedColumn !== firstColumn
+        let shouldRebalance = isInitialLayout || gap > 0.5 || (columnsWereFitted && (viewportChanged || nonFirstColumnChanged))
 
-    override func reflectScrolledClipView(_ clipView: NSClipView) {
-        lockHorizontalOrigin()
-        super.reflectScrolledClipView(clipView)
-    }
-
-    func lockHorizontalOrigin() {
-        let origin = contentView.bounds.origin
-        if origin.x != 0 {
-            contentView.setBoundsOrigin(NSPoint(x: 0, y: origin.y))
+        if shouldRebalance && abs(gap) > 0.5 {
+            isRebalancingColumns = true
+            firstColumn.width = min(firstColumn.maxWidth, max(firstColumn.minWidth, firstColumn.width + gap))
+            isRebalancingColumns = false
         }
-        if let table = documentView as? NSTableView {
-            table.frame.size.width = contentView.bounds.width
-        }
+
+        let fittedWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
+        columnsWereFitted = abs(viewportWidth - fittedWidth) <= 1
+        lastViewportWidth = viewportWidth
     }
 }
 
@@ -887,10 +889,7 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var entries: [ArchiveEntry]
-        private var isFittingColumns = false
-        private var lastVisibleWidth: CGFloat = 0
         init(entries: [ArchiveEntry]) { self.entries = entries }
-        deinit { NotificationCenter.default.removeObserver(self) }
         func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -984,46 +983,17 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
         func tableViewColumnDidResize(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            fitColumns(in: tableView)
+            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
         }
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            fitColumns(in: tableView)
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
-        @objc func clipBoundsDidChange(_ notification: Notification) {
-            guard let clipView = notification.object as? NSClipView,
-                  let tableView = clipView.documentView as? NSTableView else { return }
-            let visibleWidth = floor(clipView.bounds.width)
-            if abs(visibleWidth - lastVisibleWidth) > 1 {
-                fitColumns(in: tableView)
-            } else {
-                (tableView.enclosingScrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
-            }
-        }
-
-        func fitColumns(in tableView: NSTableView) {
-            guard !isFittingColumns,
-                  let scrollView = tableView.enclosingScrollView else { return }
-
-            isFittingColumns = true
-            defer { isFittingColumns = false }
-
-            let visibleWidth = max(420, floor(scrollView.contentView.bounds.width))
-            tableView.frame.size.width = visibleWidth
-            lastVisibleWidth = visibleWidth
-            updateColumnResizingMasks(in: tableView)
-            tableView.sizeLastColumnToFit()
-            scrollView.contentView.setBoundsOrigin(NSPoint(x: 0, y: scrollView.contentView.bounds.origin.y))
-            (scrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
-        }
-
-        private func updateColumnResizingMasks(in tableView: NSTableView) {
-            guard let lastColumn = tableView.tableColumns.last else { return }
-            for column in tableView.tableColumns {
-                column.resizingMask = column === lastColumn ? [.autoresizingMask] : [.userResizingMask, .autoresizingMask]
-            }
+        func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
+            columnIndex > 0 && newColumnIndex > 0
         }
     }
 
@@ -1037,12 +1007,12 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         table.allowsMultipleSelection = false
         table.rowHeight = 26
         table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.autosaveName = "local.codex.cleanzip.archiveEntriesTable"
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.autosaveName = "local.codex.cleanzip.archiveEntriesTable.v6"
         table.autosaveTableColumns = true
         table.backgroundColor = .clear
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("name", L10n.tr("column.name"), 380, 180, 1200),
+            ("name", L10n.tr("column.name"), 380, 180, .greatestFiniteMagnitude),
             ("size", L10n.tr("column.size"), 140, 96, 280),
             ("modified", L10n.tr("column.modified"), 240, 190, 2000)
         ]
@@ -1057,32 +1027,22 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         }
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
-        let scroll = VerticalOnlyScrollView()
+        let scroll = FinderTableScrollView()
         scroll.hasVerticalScroller = true
-        scroll.hasHorizontalScroller = false
+        scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
         scroll.drawsBackground = false
-        scroll.contentView = LockedHorizontalClipView()
-        scroll.contentView.postsBoundsChangedNotifications = true
         scroll.documentView = table
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.clipBoundsDidChange(_:)),
-            name: NSView.boundsDidChangeNotification,
-            object: scroll.contentView
-        )
-        context.coordinator.fitColumns(in: table)
         return scroll
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.entries = entries
         if let table = scrollView.documentView as? NSTableView {
-            context.coordinator.fitColumns(in: table)
             table.reloadData()
         }
-        (scrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
+        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 
@@ -1093,16 +1053,12 @@ struct SelectedItemsTable: NSViewRepresentable {
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var items: [SelectedItem]
         var selectedIDs: Binding<Set<String>>
-        private var isFittingColumns = false
         private var isApplyingSelection = false
-        private var lastVisibleWidth: CGFloat = 0
 
         init(items: [SelectedItem], selectedIDs: Binding<Set<String>>) {
             self.items = items
             self.selectedIDs = selectedIDs
         }
-
-        deinit { NotificationCenter.default.removeObserver(self) }
 
         func numberOfRows(in tableView: NSTableView) -> Int { items.count }
 
@@ -1134,23 +1090,17 @@ struct SelectedItemsTable: NSViewRepresentable {
 
         func tableViewColumnDidResize(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            fitColumns(in: tableView)
+            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
         }
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            fitColumns(in: tableView)
+            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
-        @objc func clipBoundsDidChange(_ notification: Notification) {
-            guard let clipView = notification.object as? NSClipView,
-                  let tableView = clipView.documentView as? NSTableView else { return }
-            let visibleWidth = floor(clipView.bounds.width)
-            if abs(visibleWidth - lastVisibleWidth) > 1 {
-                fitColumns(in: tableView)
-            } else {
-                (tableView.enclosingScrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
-            }
+        func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
+            columnIndex > 0 && newColumnIndex > 0
         }
 
         func applySelection(to tableView: NSTableView) {
@@ -1160,29 +1110,6 @@ struct SelectedItemsTable: NSViewRepresentable {
                 selectedIDs.wrappedValue.contains(item.id) ? index : nil
             })
             tableView.selectRowIndexes(indexes, byExtendingSelection: false)
-        }
-
-        func fitColumns(in tableView: NSTableView) {
-            guard !isFittingColumns,
-                  let scrollView = tableView.enclosingScrollView else { return }
-
-            isFittingColumns = true
-            defer { isFittingColumns = false }
-
-            let visibleWidth = max(560, floor(scrollView.contentView.bounds.width))
-            tableView.frame.size.width = visibleWidth
-            lastVisibleWidth = visibleWidth
-            updateColumnResizingMasks(in: tableView)
-            tableView.sizeLastColumnToFit()
-            scrollView.contentView.setBoundsOrigin(NSPoint(x: 0, y: scrollView.contentView.bounds.origin.y))
-            (scrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
-        }
-
-        private func updateColumnResizingMasks(in tableView: NSTableView) {
-            guard let lastColumn = tableView.tableColumns.last else { return }
-            for column in tableView.tableColumns {
-                column.resizingMask = column === lastColumn ? [.autoresizingMask] : [.userResizingMask, .autoresizingMask]
-            }
         }
 
         private func nameCell(tableView: NSTableView, item: SelectedItem) -> NSView {
@@ -1269,13 +1196,13 @@ struct SelectedItemsTable: NSViewRepresentable {
         table.allowsMultipleSelection = true
         table.rowHeight = 26
         table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.autosaveName = "local.codex.cleanzip.selectedItemsTable"
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.autosaveName = "local.codex.cleanzip.selectedItemsTable.v6"
         table.autosaveTableColumns = true
         table.backgroundColor = .clear
 
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("selectedName", L10n.tr("column.name"), 260, 180, 900),
+            ("selectedName", L10n.tr("column.name"), 260, 180, .greatestFiniteMagnitude),
             ("selectedType", L10n.tr("column.type"), 90, 70, 160),
             ("selectedSize", L10n.tr("column.size"), 120, 90, 220),
             ("selectedLocation", L10n.tr("column.location"), 360, 220, 2000)
@@ -1292,23 +1219,13 @@ struct SelectedItemsTable: NSViewRepresentable {
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
 
-        let scroll = VerticalOnlyScrollView()
+        let scroll = FinderTableScrollView()
         scroll.hasVerticalScroller = true
-        scroll.hasHorizontalScroller = false
+        scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
         scroll.drawsBackground = false
-        scroll.contentView = LockedHorizontalClipView()
-        scroll.contentView.postsBoundsChangedNotifications = true
         scroll.documentView = table
-
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.clipBoundsDidChange(_:)),
-            name: NSView.boundsDidChangeNotification,
-            object: scroll.contentView
-        )
-        context.coordinator.fitColumns(in: table)
         context.coordinator.applySelection(to: table)
         return scroll
     }
@@ -1317,11 +1234,10 @@ struct SelectedItemsTable: NSViewRepresentable {
         context.coordinator.items = items
         context.coordinator.selectedIDs = $selectedIDs
         if let table = scrollView.documentView as? NSTableView {
-            context.coordinator.fitColumns(in: table)
             table.reloadData()
             context.coordinator.applySelection(to: table)
         }
-        (scrollView as? VerticalOnlyScrollView)?.lockHorizontalOrigin()
+        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 

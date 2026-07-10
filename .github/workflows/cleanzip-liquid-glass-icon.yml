@@ -6,7 +6,7 @@ on:
       release_tag:
         description: "Release tag to update"
         required: true
-        default: "v2.6.30"
+        default: "v2.6.31"
       upload_release:
         description: "Upload pkg, zip, and checksums to the release"
         required: true
