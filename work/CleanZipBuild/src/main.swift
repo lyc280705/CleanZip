@@ -889,6 +889,7 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var entries: [ArchiveEntry]
+        private var isRestoringFirstColumn = false
         init(entries: [ArchiveEntry]) { self.entries = entries }
         func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
 
@@ -989,11 +990,23 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
+            restoreFirstColumn(in: tableView, identifier: "name")
             (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-            columnIndex > 0 && newColumnIndex > 0
+            guard tableView.tableColumns.indices.contains(columnIndex) else { return false }
+            return tableView.tableColumns[columnIndex].identifier.rawValue != "name"
+        }
+
+        private func restoreFirstColumn(in tableView: NSTableView, identifier: String) {
+            guard !isRestoringFirstColumn else { return }
+            let columnIndex = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(identifier))
+            guard columnIndex > 0 else { return }
+
+            isRestoringFirstColumn = true
+            tableView.moveColumn(columnIndex, toColumn: 0)
+            isRestoringFirstColumn = false
         }
     }
 
@@ -1054,6 +1067,7 @@ struct SelectedItemsTable: NSViewRepresentable {
         var items: [SelectedItem]
         var selectedIDs: Binding<Set<String>>
         private var isApplyingSelection = false
+        private var isRestoringFirstColumn = false
 
         init(items: [SelectedItem], selectedIDs: Binding<Set<String>>) {
             self.items = items
@@ -1096,11 +1110,23 @@ struct SelectedItemsTable: NSViewRepresentable {
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
+            restoreFirstColumn(in: tableView, identifier: "selectedName")
             (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-            columnIndex > 0 && newColumnIndex > 0
+            guard tableView.tableColumns.indices.contains(columnIndex) else { return false }
+            return tableView.tableColumns[columnIndex].identifier.rawValue != "selectedName"
+        }
+
+        private func restoreFirstColumn(in tableView: NSTableView, identifier: String) {
+            guard !isRestoringFirstColumn else { return }
+            let columnIndex = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(identifier))
+            guard columnIndex > 0 else { return }
+
+            isRestoringFirstColumn = true
+            tableView.moveColumn(columnIndex, toColumn: 0)
+            isRestoringFirstColumn = false
         }
 
         func applySelection(to tableView: NSTableView) {
