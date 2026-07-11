@@ -12,6 +12,8 @@ BUILD_DIR="$ROOT/build"
 export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$SERVICE/Contents/MacOS" "$SERVICE/Contents/Resources"
+cp "$ROOT/src/CleanZip-Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/src/CleanZipService-Info.plist" "$SERVICE/Contents/Info.plist"
 
 if [[ -d "$RESOURCES" ]]; then
   rsync -a "$RESOURCES/" "$APP/Contents/Resources/"

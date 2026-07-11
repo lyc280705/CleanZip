@@ -25,7 +25,7 @@ enum L10n {
     }
 }
 
-struct ArchiveEntry: Identifiable {
+struct ArchiveEntry: Identifiable, Equatable {
     let id = UUID()
     let path: String
     let size: Int64
@@ -48,17 +48,29 @@ extension Notification.Name {
     static let cleanZipStateDidChange = Notification.Name("local.codex.cleanzip.stateDidChange")
 }
 
-struct SelectedItem: Identifiable {
+struct SelectedItem: Identifiable, Equatable {
     let url: URL
+    let isDirectory: Bool
+    let byteSize: Int64?
+
+    init(url: URL) {
+        self.url = url
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+        isDirectory = values?.isDirectory ?? false
+        if let fileSize = values?.fileSize {
+            byteSize = Int64(fileSize)
+        } else {
+            byteSize = nil
+        }
+    }
+
     var id: String { url.path }
     var name: String { url.lastPathComponent }
     var location: String { url.deletingLastPathComponent().path }
-    var isDirectory: Bool { (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false }
     var typeName: String { isDirectory ? L10n.tr("item.type.folder") : (url.pathExtension.isEmpty ? L10n.tr("item.type.file") : url.pathExtension.uppercased()) }
     var sizeText: String {
         if isDirectory { return "--" }
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-        return AppState.formatBytes(size)
+        return AppState.formatBytes(byteSize ?? 0)
     }
 }
 
@@ -126,6 +138,12 @@ final class ArchiveEngine {
     private let fileManager = FileManager.default
 
     var sevenZipURL: URL? {
+#if CLEANZIP_TESTING
+        if let testPath = ProcessInfo.processInfo.environment["CLEANZIP_7ZZ_PATH"],
+           fileManager.isExecutableFile(atPath: testPath) {
+            return URL(fileURLWithPath: testPath)
+        }
+#endif
         if let bundled = Bundle.main.url(forResource: "7zz", withExtension: nil),
            fileManager.isExecutableFile(atPath: bundled.path) {
             return bundled
@@ -271,9 +289,11 @@ final class ArchiveEngine {
         var entries: [ArchiveEntry] = []
         var current: [String: String] = [:]
         func flush() {
-            guard let path = current["Path"], !path.isEmpty, current["Folder"] != nil else { return }
+            guard let path = current["Path"], !path.isEmpty, current["Size"] != nil else { return }
             let size = Int64(current["Size"] ?? "0") ?? 0
-            entries.append(ArchiveEntry(path: path, size: size, modified: formatArchiveTimestamp(current["Modified"] ?? ""), isDirectory: (current["Folder"] ?? "-") == "+"))
+            let attributes = current["Attributes"] ?? ""
+            let isDirectory = current["Folder"] == "+" || attributes.hasPrefix("D") || path.hasSuffix("/")
+            entries.append(ArchiveEntry(path: path, size: size, modified: formatArchiveTimestamp(current["Modified"] ?? ""), isDirectory: isDirectory))
         }
         for line in output.split(separator: "\n", omittingEmptySubsequences: false) {
             let text = String(line)
@@ -347,11 +367,25 @@ final class ArchiveEngine {
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
-    @Published var selectedURLs: [URL] = []
+    @Published var selectedURLs: [URL] = [] {
+        didSet {
+            selectedItems = selectedURLs.map(SelectedItem.init(url:))
+            selectedItemsRevision &+= 1
+        }
+    }
     @Published var selectedItemIDs: Set<String> = []
     @Published var archiveURL: URL?
-    @Published var entries: [ArchiveEntry] = []
-    @Published var searchText = ""
+    @Published var entries: [ArchiveEntry] = [] {
+        didSet {
+            entriesRevision &+= 1
+            refreshEntryDerivedState()
+        }
+    }
+    @Published var searchText = "" {
+        didSet {
+            if searchText != oldValue { refreshFilteredEntries() }
+        }
+    }
     @Published var status = L10n.tr("status.empty")
     @Published var isBusy = false
     @Published var operationProgress: OperationProgress?
@@ -359,9 +393,12 @@ final class AppState: ObservableObject {
     @Published var format: ArchiveFormat = .zip
     @Published var splitPreset: SplitPreset = SplitPreset.all[0]
     @Published var customSplitMB = "100"
-    var selectedItems: [SelectedItem] { selectedURLs.map(SelectedItem.init(url:)) }
-    var totalFiles: Int { entries.filter { !$0.isDirectory }.count }
-    var totalBytes: Int64 { entries.reduce(0) { $0 + max($1.size, 0) } }
+    private(set) var selectedItems: [SelectedItem] = []
+    private(set) var selectedItemsRevision = 0
+    private(set) var entriesRevision = 0
+    private(set) var filteredEntries: [ArchiveEntry] = []
+    private(set) var totalFiles = 0
+    private(set) var totalBytes: Int64 = 0
 
     func handle(urls: [URL]) {
         guard !urls.isEmpty else { return }
@@ -500,17 +537,20 @@ final class AppState: ObservableObject {
         guard let archiveURL else { return }
         isBusy = true
         status = L10n.tr("status.testing")
+        notifyStateDidChange()
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try ArchiveEngine.shared.testArchive(archiveURL)
                 DispatchQueue.main.async {
                     self.status = L10n.tr("status.testPassed")
                     self.isBusy = false
+                    self.notifyStateDidChange()
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.status = L10n.tr("status.testFailed", error.localizedDescription)
                     self.isBusy = false
+                    self.notifyStateDidChange()
                 }
             }
         }
@@ -569,6 +609,26 @@ final class AppState: ObservableObject {
         return result
     }
 
+    private func refreshEntryDerivedState() {
+        var files = 0
+        var bytes: Int64 = 0
+        for entry in entries where !entry.isDirectory {
+            files += 1
+            bytes += max(entry.size, 0)
+        }
+        totalFiles = files
+        totalBytes = bytes
+        refreshFilteredEntries()
+    }
+
+    private func refreshFilteredEntries() {
+        if searchText.isEmpty {
+            filteredEntries = entries
+        } else {
+            filteredEntries = entries.filter { $0.path.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+
     func prepareArchiveOperation(urls: [URL], title: String, detail: String) {
         searchText = ""
         archiveURL = urls.count == 1 ? urls[0] : nil
@@ -588,16 +648,16 @@ final class AppState: ObservableObject {
     func updateOperationProgress(_ fraction: Double) {
         let clamped = min(max(fraction, 0), 1)
         let previous = operationProgress?.fraction ?? -1
-        guard clamped >= 1 || abs(clamped - previous) >= 0.005 else { return }
+        let percent = Int((clamped * 100).rounded())
+        let previousPercent = Int((previous * 100).rounded())
+        guard clamped >= 1 || percent != previousPercent else { return }
         if operationProgress == nil {
             operationProgress = OperationProgress(title: L10n.tr("operation.processing"), detail: "", fraction: clamped)
         } else {
             operationProgress?.fraction = clamped
         }
         let title = operationProgress?.title ?? L10n.tr("operation.processing")
-        let percent = Int((clamped * 100).rounded())
         status = L10n.tr("status.progress", title, String(percent))
-        notifyStateDidChange()
     }
 
     func finishOperation(status: String) {
@@ -609,6 +669,37 @@ final class AppState: ObservableObject {
 
     private func notifyStateDidChange() {
         NotificationCenter.default.post(name: .cleanZipStateDidChange, object: self)
+    }
+}
+
+enum FinderTableBehavior {
+    static func configure(_ table: NSTableView, allowsMultipleSelection: Bool, autosaveName: String) {
+        table.usesAlternatingRowBackgroundColors = true
+        table.allowsColumnReordering = true
+        table.allowsColumnResizing = true
+        table.allowsColumnSelection = false
+        table.allowsMultipleSelection = allowsMultipleSelection
+        table.rowHeight = 26
+        table.headerView = NSTableHeaderView()
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.autosaveName = autosaveName
+        table.autosaveTableColumns = true
+        table.backgroundColor = .clear
+    }
+
+    static func shouldReorderColumn(
+        in tableView: NSTableView,
+        columnIndex: Int,
+        newColumnIndex: Int,
+        lockedIdentifier: String
+    ) -> Bool {
+        guard tableView.tableColumns.indices.contains(columnIndex) else { return false }
+        let column = tableView.tableColumns[columnIndex]
+        guard column.identifier.rawValue != lockedIdentifier else { return false }
+
+        // AppKit first proposes -1 when a header drag begins. Other columns may
+        // start dragging, but index 0 remains reserved for the name column.
+        return newColumnIndex == -1 || newColumnIndex > 0
     }
 }
 
@@ -629,10 +720,13 @@ final class FinderTableScrollView: NSScrollView {
               table.numberOfColumns > 0 else { return }
 
         let viewportWidth = floor(contentView.bounds.width)
+        guard viewportWidth > 0 else { return }
         let columnsWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
-        let gap = viewportWidth - columnsWidth
         let isInitialLayout = lastViewportWidth <= 0
         let viewportChanged = !isInitialLayout && abs(viewportWidth - lastViewportWidth) > 0.5
+        guard isInitialLayout || viewportChanged || resizedColumn != nil else { return }
+
+        let gap = viewportWidth - columnsWidth
         let nonFirstColumnChanged = resizedColumn != nil && resizedColumn !== firstColumn
         let shouldRebalance = isInitialLayout || gap > 0.5 || (columnsWereFitted && (viewportChanged || nonFirstColumnChanged))
 
@@ -645,6 +739,16 @@ final class FinderTableScrollView: NSScrollView {
         let fittedWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
         columnsWereFitted = abs(viewportWidth - fittedWidth) <= 1
         lastViewportWidth = viewportWidth
+
+        let documentWidth = max(viewportWidth, fittedWidth)
+        if abs(table.frame.width - documentWidth) > 0.5 {
+            isRebalancingColumns = true
+            let autoresizingStyle = table.columnAutoresizingStyle
+            table.columnAutoresizingStyle = .noColumnAutoresizing
+            table.setFrameSize(NSSize(width: documentWidth, height: table.frame.height))
+            table.columnAutoresizingStyle = autoresizingStyle
+            isRebalancingColumns = false
+        }
     }
 }
 
@@ -691,7 +795,12 @@ final class ServiceProgressHUD {
 
     func update(fraction newFraction: Double, detail newDetail: String? = nil) {
         guard !finished else { return }
-        fraction = min(max(newFraction, 0), 1)
+        let clamped = min(max(newFraction, 0), 1)
+        let percentChanged = Int((clamped * 100).rounded()) != Int((fraction * 100).rounded())
+        let detailChanged = newDetail.map { !$0.isEmpty && $0 != detail } ?? false
+        guard percentChanged || detailChanged else { return }
+
+        fraction = clamped
         if let newDetail, !newDetail.isEmpty { detail = newDetail }
         updateVisibleControls()
     }
@@ -886,11 +995,19 @@ final class ServiceProgressHUD {
 
 struct ArchiveEntriesTable: NSViewRepresentable {
     let entries: [ArchiveEntry]
+    let contentRevision: Int
+    let filter: String
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var entries: [ArchiveEntry]
-        private var isRestoringFirstColumn = false
-        init(entries: [ArchiveEntry]) { self.entries = entries }
+        var contentRevision: Int
+        var filter: String
+
+        init(entries: [ArchiveEntry], contentRevision: Int, filter: String) {
+            self.entries = entries
+            self.contentRevision = contentRevision
+            self.filter = filter
+        }
         func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -990,40 +1107,32 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            restoreFirstColumn(in: tableView, identifier: "name")
             (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-            guard tableView.tableColumns.indices.contains(columnIndex) else { return false }
-            return tableView.tableColumns[columnIndex].identifier.rawValue != "name"
+            FinderTableBehavior.shouldReorderColumn(
+                in: tableView,
+                columnIndex: columnIndex,
+                newColumnIndex: newColumnIndex,
+                lockedIdentifier: "name"
+            )
         }
 
-        private func restoreFirstColumn(in tableView: NSTableView, identifier: String) {
-            guard !isRestoringFirstColumn else { return }
-            let columnIndex = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(identifier))
-            guard columnIndex > 0 else { return }
-
-            isRestoringFirstColumn = true
-            tableView.moveColumn(columnIndex, toColumn: 0)
-            isRestoringFirstColumn = false
-        }
+        func tableView(_ tableView: NSTableView, shouldSelect tableColumn: NSTableColumn?) -> Bool { false }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(entries: entries) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(entries: entries, contentRevision: contentRevision, filter: filter)
+    }
 
     func makeNSView(context: Context) -> NSScrollView {
         let table = NSTableView()
-        table.usesAlternatingRowBackgroundColors = true
-        table.allowsColumnReordering = true
-        table.allowsColumnResizing = true
-        table.allowsMultipleSelection = false
-        table.rowHeight = 26
-        table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        table.autosaveName = "local.codex.cleanzip.archiveEntriesTable.v6"
-        table.autosaveTableColumns = true
-        table.backgroundColor = .clear
+        FinderTableBehavior.configure(
+            table,
+            allowsMultipleSelection: false,
+            autosaveName: "local.codex.cleanzip.archiveEntriesTable.v7"
+        )
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
             ("name", L10n.tr("column.name"), 380, 180, .greatestFiniteMagnitude),
             ("size", L10n.tr("column.size"), 140, 96, 280),
@@ -1051,8 +1160,11 @@ struct ArchiveEntriesTable: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        context.coordinator.entries = entries
-        if let table = scrollView.documentView as? NSTableView {
+        let contentChanged = context.coordinator.contentRevision != contentRevision || context.coordinator.filter != filter
+        if contentChanged, let table = scrollView.documentView as? NSTableView {
+            context.coordinator.entries = entries
+            context.coordinator.contentRevision = contentRevision
+            context.coordinator.filter = filter
             table.reloadData()
         }
         (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
@@ -1061,17 +1173,21 @@ struct ArchiveEntriesTable: NSViewRepresentable {
 
 struct SelectedItemsTable: NSViewRepresentable {
     let items: [SelectedItem]
+    let contentRevision: Int
     @Binding var selectedIDs: Set<String>
 
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var items: [SelectedItem]
+        var contentRevision: Int
         var selectedIDs: Binding<Set<String>>
+        var appliedSelection: Set<String>
         private var isApplyingSelection = false
-        private var isRestoringFirstColumn = false
 
-        init(items: [SelectedItem], selectedIDs: Binding<Set<String>>) {
+        init(items: [SelectedItem], contentRevision: Int, selectedIDs: Binding<Set<String>>) {
             self.items = items
+            self.contentRevision = contentRevision
             self.selectedIDs = selectedIDs
+            appliedSelection = selectedIDs.wrappedValue
         }
 
         func numberOfRows(in tableView: NSTableView) -> Int { items.count }
@@ -1099,7 +1215,11 @@ struct SelectedItemsTable: NSViewRepresentable {
             let ids = tableView.selectedRowIndexes.compactMap { row in
                 row < items.count ? items[row].id : nil
             }
-            selectedIDs.wrappedValue = Set(ids)
+            let selection = Set(ids)
+            appliedSelection = selection
+            if selectedIDs.wrappedValue != selection {
+                selectedIDs.wrappedValue = selection
+            }
         }
 
         func tableViewColumnDidResize(_ notification: Notification) {
@@ -1110,24 +1230,19 @@ struct SelectedItemsTable: NSViewRepresentable {
 
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let tableView = notification.object as? NSTableView else { return }
-            restoreFirstColumn(in: tableView, identifier: "selectedName")
             (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
-            guard tableView.tableColumns.indices.contains(columnIndex) else { return false }
-            return tableView.tableColumns[columnIndex].identifier.rawValue != "selectedName"
+            FinderTableBehavior.shouldReorderColumn(
+                in: tableView,
+                columnIndex: columnIndex,
+                newColumnIndex: newColumnIndex,
+                lockedIdentifier: "selectedName"
+            )
         }
 
-        private func restoreFirstColumn(in tableView: NSTableView, identifier: String) {
-            guard !isRestoringFirstColumn else { return }
-            let columnIndex = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(identifier))
-            guard columnIndex > 0 else { return }
-
-            isRestoringFirstColumn = true
-            tableView.moveColumn(columnIndex, toColumn: 0)
-            isRestoringFirstColumn = false
-        }
+        func tableView(_ tableView: NSTableView, shouldSelect tableColumn: NSTableColumn?) -> Bool { false }
 
         func applySelection(to tableView: NSTableView) {
             isApplyingSelection = true
@@ -1136,6 +1251,7 @@ struct SelectedItemsTable: NSViewRepresentable {
                 selectedIDs.wrappedValue.contains(item.id) ? index : nil
             })
             tableView.selectRowIndexes(indexes, byExtendingSelection: false)
+            appliedSelection = selectedIDs.wrappedValue
         }
 
         private func nameCell(tableView: NSTableView, item: SelectedItem) -> NSView {
@@ -1211,21 +1327,16 @@ struct SelectedItemsTable: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(items: items, selectedIDs: $selectedIDs)
+        Coordinator(items: items, contentRevision: contentRevision, selectedIDs: $selectedIDs)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
         let table = NSTableView()
-        table.usesAlternatingRowBackgroundColors = true
-        table.allowsColumnReordering = true
-        table.allowsColumnResizing = true
-        table.allowsMultipleSelection = true
-        table.rowHeight = 26
-        table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        table.autosaveName = "local.codex.cleanzip.selectedItemsTable.v6"
-        table.autosaveTableColumns = true
-        table.backgroundColor = .clear
+        FinderTableBehavior.configure(
+            table,
+            allowsMultipleSelection: true,
+            autosaveName: "local.codex.cleanzip.selectedItemsTable.v7"
+        )
 
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
             ("selectedName", L10n.tr("column.name"), 260, 180, .greatestFiniteMagnitude),
@@ -1257,11 +1368,18 @@ struct SelectedItemsTable: NSViewRepresentable {
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        context.coordinator.items = items
+        let contentChanged = context.coordinator.contentRevision != contentRevision
+        let selectionChanged = context.coordinator.appliedSelection != selectedIDs
         context.coordinator.selectedIDs = $selectedIDs
         if let table = scrollView.documentView as? NSTableView {
-            table.reloadData()
-            context.coordinator.applySelection(to: table)
+            if contentChanged {
+                context.coordinator.items = items
+                context.coordinator.contentRevision = contentRevision
+                table.reloadData()
+            }
+            if contentChanged || selectionChanged {
+                context.coordinator.applySelection(to: table)
+            }
         }
         (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
@@ -1271,11 +1389,6 @@ struct ContentView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dropIsTargeted = false
-
-    private var filteredEntries: [ArchiveEntry] {
-        guard !state.searchText.isEmpty else { return state.entries }
-        return state.entries.filter { $0.path.localizedCaseInsensitiveContains(state.searchText) }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1299,7 +1412,7 @@ struct ContentView: View {
         .frame(minWidth: 820, minHeight: 560)
         .background(SystemContentBackground().ignoresSafeArea())
         .animation(contentAnimation, value: contentIdentity)
-        .animation(contentAnimation, value: dropIsTargeted)
+        .animation(dropAnimation, value: dropIsTargeted)
         .onDrop(of: [.fileURL], isTargeted: $dropIsTargeted, perform: handleDrop)
         .sheet(isPresented: $state.showingCompressSheet) { CompressSheet().environmentObject(state) }
     }
@@ -1311,14 +1424,15 @@ struct ContentView: View {
     }
 
     private var contentAnimation: Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.18)
+        reduceMotion ? nil : .smooth(duration: 0.16)
+    }
+
+    private var dropAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0)
     }
 
     private var contentTransition: AnyTransition {
-        reduceMotion ? .opacity : .asymmetric(
-            insertion: .opacity.combined(with: .move(edge: .bottom)),
-            removal: .opacity
-        )
+        .opacity
     }
 
     @ViewBuilder
@@ -1358,7 +1472,11 @@ struct ContentView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
-            ArchiveEntriesTable(entries: filteredEntries)
+            ArchiveEntriesTable(
+                entries: state.filteredEntries,
+                contentRevision: state.entriesRevision,
+                filter: state.searchText
+            )
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
         }
@@ -1375,7 +1493,11 @@ struct ContentView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
-            SelectedItemsTable(items: state.selectedItems, selectedIDs: $state.selectedItemIDs)
+            SelectedItemsTable(
+                items: state.selectedItems,
+                contentRevision: state.selectedItemsRevision,
+                selectedIDs: $state.selectedItemIDs
+            )
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
@@ -1406,17 +1528,20 @@ struct ContentView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        var urls: [URL] = []
+        let lock = NSLock()
+        var urls = [URL?](repeating: nil, count: providers.count)
         let group = DispatchGroup()
-        for provider in providers {
+        for (index, provider) in providers.enumerated() {
             group.enter()
             provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
                 defer { group.leave() }
                 guard let data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                urls.append(url)
+                lock.lock()
+                urls[index] = url
+                lock.unlock()
             }
         }
-        group.notify(queue: .main) { state.handle(urls: urls) }
+        group.notify(queue: .main) { state.handle(urls: urls.compactMap { $0 }) }
         return true
     }
 }
@@ -1446,7 +1571,7 @@ struct CompressSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: state.splitPreset.id)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.16), value: state.splitPreset.id)
             Text(L10n.tr("settings.cleanMetadataNote")).foregroundStyle(.secondary).font(.footnote)
             HStack {
                 Spacer()
@@ -1887,6 +2012,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     }
 }
 
+#if !CLEANZIP_TESTING
 @main
 @MainActor
 struct CleanZipMain {
@@ -1898,3 +2024,4 @@ struct CleanZipMain {
         app.run()
     }
 }
+#endif
