@@ -7,10 +7,11 @@ SERVICE="$ROOT/CleanZipService.service"
 DIST="$ROOT/dist"
 ROOT_DIR="$DIST/pkgroot"
 SCRIPTS_DIR="$DIST/scripts"
+COMPONENT_PLIST="$ROOT/src/PackageComponents.plist"
 
 export COPYFILE_DISABLE=1
 
-if [[ ! -d "$APP" || ! -d "$SERVICE" ]]; then
+if [[ ! -d "$APP" || ! -d "$SERVICE" || ! -f "$COMPONENT_PLIST" ]]; then
   echo "CleanZip.app or CleanZipService.service is missing. Run src/build_xcode.sh or src/build.sh first." >&2
   exit 2
 fi
@@ -54,11 +55,24 @@ chmod +x "$SCRIPTS_DIR/postinstall"
 
 pkgbuild \
   --root "$ROOT_DIR" \
+  --component-plist "$COMPONENT_PLIST" \
   --scripts "$SCRIPTS_DIR" \
   --identifier "local.codex.cleanzip.pkg" \
   --version "$PACKAGE_VERSION" \
   --install-location "/" \
   "$DIST/$PKG_NAME"
+
+PACKAGE_VERIFY_DIR="$DIST/pkgverify"
+pkgutil --expand "$DIST/$PKG_NAME" "$PACKAGE_VERIFY_DIR"
+PACKAGE_INFO="$PACKAGE_VERIFY_DIR/PackageInfo"
+RELOCATE_COUNT="$(xmllint --xpath 'count(/pkg-info/relocate/bundle)' "$PACKAGE_INFO")"
+APP_BUNDLE_PATH="$(xmllint --xpath 'string(/pkg-info/bundle[@id="local.codex.cleanzip"]/@path)' "$PACKAGE_INFO")"
+rm -rf "$PACKAGE_VERIFY_DIR"
+
+if [[ "$RELOCATE_COUNT" != "0" || "$APP_BUNDLE_PATH" != "./Applications/CleanZip.app" ]]; then
+  echo "Package validation failed: CleanZip.app must be fixed at /Applications and non-relocatable." >&2
+  exit 3
+fi
 
 ZIP_ROOT="$DIST/ziproot/CleanZip"
 mkdir -p "$ZIP_ROOT"
