@@ -11,7 +11,7 @@ struct TableBehaviorTests {
         testNativeTableConfiguration()
         testArchiveColumnReorderingPolicy()
         testSelectedItemsColumnReorderingPolicy()
-        testFinderStyleColumnSizing()
+        testNativeColumnSizing()
         testSelectedItemMetadataSnapshot()
         testProgressPublishingIsDeduplicated()
         testArchiveDerivedStateIsCached()
@@ -38,7 +38,12 @@ struct TableBehaviorTests {
         expect(table.allowsColumnResizing, "column resizing should be enabled")
         expect(!table.allowsColumnSelection, "column headers must never become selected")
         expect(table.allowsMultipleSelection, "selected-items rows should allow multiple selection")
-        expect(table.columnAutoresizingStyle == .firstColumnOnlyAutoresizingStyle, "only the first column should autoresize with the window")
+        expect(table.columnAutoresizingStyle == .reverseSequentialColumnAutoresizingStyle, "window resizing should use AppKit's reverse sequential policy")
+
+        let flexibleMask = FinderTableBehavior.resizingMask(isFlexibleColumn: true)
+        let fixedMask = FinderTableBehavior.resizingMask(isFlexibleColumn: false)
+        expect(flexibleMask.contains(.userResizingMask) && flexibleMask.contains(.autoresizingMask), "the name column should support user and window resizing")
+        expect(fixedMask.contains(.userResizingMask) && !fixedMask.contains(.autoresizingMask), "later columns should resize only when their divider is dragged")
     }
 
     private static func testArchiveColumnReorderingPolicy() {
@@ -68,8 +73,8 @@ struct TableBehaviorTests {
         expect(coordinator.tableView(table, shouldReorderColumn: 3, toColumn: 1), "selected-item non-name columns should reorder")
     }
 
-    private static func testFinderStyleColumnSizing() {
-        let scroll = FinderTableScrollView(frame: NSRect(x: 0, y: 0, width: 820, height: 400))
+    private static func testNativeColumnSizing() {
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 820, height: 400))
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -81,53 +86,39 @@ struct TableBehaviorTests {
             (120, 90, 220),
             (260, 220, 2_000)
         ]
-        for (column, sizing) in zip(table.tableColumns, widths) {
+        for (index, pair) in zip(table.tableColumns.indices, zip(table.tableColumns, widths)) {
+            let (column, sizing) = pair
             column.width = sizing.0
             column.minWidth = sizing.1
             column.maxWidth = sizing.2
-            column.resizingMask = [.userResizingMask, .autoresizingMask]
+            column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: index == 0)
         }
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.columnAutoresizingStyle = .reverseSequentialColumnAutoresizingStyle
         scroll.documentView = table
         scroll.layoutSubtreeIfNeeded()
-        scroll.rebalanceColumnsToViewport()
 
-        let fixedWidths = Array(table.tableColumns.dropFirst().map(\.width))
-        expect(isFitted(table, in: scroll), "initial columns should snap to the viewport")
-        expect(!canScrollHorizontally(scroll), "a fitted table must not scroll horizontally")
+        expect(!canScrollHorizontally(scroll), "columns that fit should not scroll horizontally")
 
-        let firstBeforeGrow = table.tableColumns[0].width
+        let firstColumn = table.tableColumns[0]
+        let typeColumn = table.tableColumns[1]
+        let firstBeforeDividerDrag = firstColumn.width
+        let typeBeforeDividerDrag = typeColumn.width
+        typeColumn.width += 36
+        scroll.layoutSubtreeIfNeeded()
+        expect(approximately(firstColumn.width, firstBeforeDividerDrag), "resizing one divider must not rewrite another column")
+        expect(approximately(typeColumn.width, typeBeforeDividerDrag + 36), "the dragged column should keep its native AppKit width")
+        expect(columnsWidth(table) > scroll.contentView.bounds.width, "a wider user-resized column should create native table overflow")
+
         scroll.setFrameSize(NSSize(width: 980, height: 400))
         scroll.layoutSubtreeIfNeeded()
-        scroll.rebalanceColumnsToViewport()
-        expect(table.tableColumns[0].width > firstBeforeGrow, "growing the window should grow the first column")
-        expect(equalWidths(Array(table.tableColumns.dropFirst().map(\.width)), fixedWidths), "growing the window must not resize later columns")
-        expect(isFitted(table, in: scroll), "grown columns should remain fitted")
-        expect(!canScrollHorizontally(scroll), "a grown fitted table must not scroll horizontally")
+        expect(!canScrollHorizontally(scroll), "expanding the viewport should naturally remove overflow")
 
-        let firstBeforeShrink = table.tableColumns[0].width
-        scroll.setFrameSize(NSSize(width: 860, height: 400))
-        scroll.layoutSubtreeIfNeeded()
-        scroll.rebalanceColumnsToViewport()
-        expect(table.tableColumns[0].width < firstBeforeShrink, "shrinking the window should shrink the first column")
-        expect(equalWidths(Array(table.tableColumns.dropFirst().map(\.width)), fixedWidths), "shrinking the window must not resize later columns")
-        expect(isFitted(table, in: scroll), "shrunk columns should remain fitted while the first column has room")
-        expect(!canScrollHorizontally(scroll), "a shrunk fitted table must not scroll horizontally")
-
-        let typeColumn = table.tableColumns[1]
-        let firstBeforeDividerDrag = table.tableColumns[0].width
-        typeColumn.width += 36
-        scroll.rebalanceColumnsToViewport(resizedColumn: typeColumn)
-        expect(approximately(table.tableColumns[0].width, firstBeforeDividerDrag - 36), "resizing a later divider should absorb the delta in the first column")
-        expect(isFitted(table, in: scroll), "later-column resizing should snap back to the viewport")
-
-        table.tableColumns[0].width = table.tableColumns[0].minWidth
+        firstColumn.width = firstColumn.minWidth
         scroll.setFrameSize(NSSize(width: 420, height: 400))
         scroll.layoutSubtreeIfNeeded()
-        scroll.rebalanceColumnsToViewport(resizedColumn: table.tableColumns[0])
-        expect(approximately(table.tableColumns[0].width, table.tableColumns[0].minWidth), "the first column must respect its minimum width")
-        expect(columnsWidth(table) > scroll.contentView.bounds.width + 1, "the table should overflow only after the first column reaches its minimum")
-        expect(canScrollHorizontally(scroll), "horizontal scrolling should become available after minimum-width overflow")
+        expect(approximately(firstColumn.width, firstColumn.minWidth), "the first column must respect its minimum width")
+        expect(columnsWidth(table) > scroll.contentView.bounds.width + 1, "columns should overflow only when their native minimum widths cannot fit")
+        expect(canScrollHorizontally(scroll), "minimum-width overflow should use the standard horizontal scroller")
     }
 
     private static func testSelectedItemMetadataSnapshot() {
@@ -246,20 +237,12 @@ struct TableBehaviorTests {
         return table.rect(ofColumn: table.numberOfColumns - 1).maxX
     }
 
-    private static func isFitted(_ table: NSTableView, in scroll: NSScrollView) -> Bool {
-        approximately(columnsWidth(table), scroll.contentView.bounds.width, tolerance: 1.5)
-    }
-
     private static func canScrollHorizontally(_ scroll: NSScrollView) -> Bool {
         let clipView = scroll.contentView
         var proposedBounds = clipView.bounds
         proposedBounds.origin.x += 80
         let constrainedBounds = clipView.constrainBoundsRect(proposedBounds)
         return abs(constrainedBounds.origin.x - clipView.bounds.origin.x) > 1
-    }
-
-    private static func equalWidths(_ lhs: [CGFloat], _ rhs: [CGFloat]) -> Bool {
-        lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { approximately($0, $1) }
     }
 
     private static func approximately(_ lhs: CGFloat, _ rhs: CGFloat, tolerance: CGFloat = 1) -> Bool {

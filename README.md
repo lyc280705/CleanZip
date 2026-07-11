@@ -13,7 +13,7 @@
   ·
   <a href="https://lyc280705.github.io/CleanZip/">Product page</a>
   ·
-  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.32">CleanZip 2.6.32</a>
+  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.33">CleanZip 2.6.33</a>
   ·
   <a href="#build-from-source">Build from source</a>
 </p>
@@ -59,7 +59,7 @@ It is intentionally small: no always-on background app, no history database, no 
 
 ## Download
 
-Download `CleanZip-2.6.32.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
+Download `CleanZip-2.6.33.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
 
 The installer places:
 
@@ -70,9 +70,9 @@ CleanZip is ad-hoc signed for open source distribution, but it is not notarized 
 
 For the `.pkg` installer:
 
-1. In Finder, Control-click `CleanZip-2.6.32.pkg` and choose **Open**.
+1. In Finder, Control-click `CleanZip-2.6.33.pkg` and choose **Open**.
 2. If the same warning still appears with only **Done** and **Move to Trash**, open **System Settings** -> **Privacy & Security**.
-3. At the bottom of Privacy & Security, choose **Open Anyway** for `CleanZip-2.6.32.pkg`, then confirm.
+3. At the bottom of Privacy & Security, choose **Open Anyway** for `CleanZip-2.6.33.pkg`, then confirm.
 
 After installation, if macOS blocks `CleanZip.app` itself, Control-click `CleanZip.app` in `/Applications` and choose **Open**. If it is still blocked, use **System Settings** -> **Privacy & Security** -> **Open Anyway** for `CleanZip.app`.
 
@@ -81,11 +81,11 @@ After you approve the installer or app once, macOS opens it normally.
 Advanced terminal alternative for the downloaded package:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Downloads/CleanZip-2.6.32.pkg
-open ~/Downloads/CleanZip-2.6.32.pkg
+xattr -dr com.apple.quarantine ~/Downloads/CleanZip-2.6.33.pkg
+open ~/Downloads/CleanZip-2.6.33.pkg
 ```
 
-Manual installation is also available from `CleanZip-2.6.32.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
+Manual installation is also available from `CleanZip-2.6.33.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
 
 ## Compatibility
 
@@ -172,7 +172,7 @@ gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref m
 To rebuild and update an existing GitHub release asset set:
 
 ```sh
-gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main -f release_tag=v2.6.32 -f upload_release=true
+gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main -f release_tag=v2.6.33 -f upload_release=true
 ```
 
 Lightweight local fallback with Command Line Tools:

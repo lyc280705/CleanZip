@@ -681,10 +681,14 @@ enum FinderTableBehavior {
         table.allowsMultipleSelection = allowsMultipleSelection
         table.rowHeight = 26
         table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.columnAutoresizingStyle = .reverseSequentialColumnAutoresizingStyle
         table.autosaveName = autosaveName
         table.autosaveTableColumns = true
         table.backgroundColor = .clear
+    }
+
+    static func resizingMask(isFlexibleColumn: Bool) -> NSTableColumn.ResizingOptions {
+        isFlexibleColumn ? [.userResizingMask, .autoresizingMask] : [.userResizingMask]
     }
 
     static func shouldReorderColumn(
@@ -700,55 +704,6 @@ enum FinderTableBehavior {
         // AppKit first proposes -1 when a header drag begins. Other columns may
         // start dragging, but index 0 remains reserved for the name column.
         return newColumnIndex == -1 || newColumnIndex > 0
-    }
-}
-
-final class FinderTableScrollView: NSScrollView {
-    private var isRebalancingColumns = false
-    private var lastViewportWidth: CGFloat = 0
-    private var columnsWereFitted = true
-
-    override func layout() {
-        super.layout()
-        rebalanceColumnsToViewport()
-    }
-
-    func rebalanceColumnsToViewport(resizedColumn: NSTableColumn? = nil) {
-        guard !isRebalancingColumns,
-              let table = documentView as? NSTableView,
-              let firstColumn = table.tableColumns.first,
-              table.numberOfColumns > 0 else { return }
-
-        let viewportWidth = floor(contentView.bounds.width)
-        guard viewportWidth > 0 else { return }
-        let columnsWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
-        let isInitialLayout = lastViewportWidth <= 0
-        let viewportChanged = !isInitialLayout && abs(viewportWidth - lastViewportWidth) > 0.5
-        guard isInitialLayout || viewportChanged || resizedColumn != nil else { return }
-
-        let gap = viewportWidth - columnsWidth
-        let nonFirstColumnChanged = resizedColumn != nil && resizedColumn !== firstColumn
-        let shouldRebalance = isInitialLayout || gap > 0.5 || (columnsWereFitted && (viewportChanged || nonFirstColumnChanged))
-
-        if shouldRebalance && abs(gap) > 0.5 {
-            isRebalancingColumns = true
-            firstColumn.width = min(firstColumn.maxWidth, max(firstColumn.minWidth, firstColumn.width + gap))
-            isRebalancingColumns = false
-        }
-
-        let fittedWidth = ceil(table.rect(ofColumn: table.numberOfColumns - 1).maxX)
-        columnsWereFitted = abs(viewportWidth - fittedWidth) <= 1
-        lastViewportWidth = viewportWidth
-
-        let documentWidth = max(viewportWidth, fittedWidth)
-        if abs(table.frame.width - documentWidth) > 0.5 {
-            isRebalancingColumns = true
-            let autoresizingStyle = table.columnAutoresizingStyle
-            table.columnAutoresizingStyle = .noColumnAutoresizing
-            table.setFrameSize(NSSize(width: documentWidth, height: table.frame.height))
-            table.columnAutoresizingStyle = autoresizingStyle
-            isRebalancingColumns = false
-        }
     }
 }
 
@@ -1099,17 +1054,6 @@ struct ArchiveEntriesTable: NSViewRepresentable {
             return cell
         }
 
-        func tableViewColumnDidResize(_ notification: Notification) {
-            guard let tableView = notification.object as? NSTableView else { return }
-            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
-        }
-
-        func tableViewColumnDidMove(_ notification: Notification) {
-            guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
-        }
-
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
             FinderTableBehavior.shouldReorderColumn(
                 in: tableView,
@@ -1131,10 +1075,10 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         FinderTableBehavior.configure(
             table,
             allowsMultipleSelection: false,
-            autosaveName: "local.codex.cleanzip.archiveEntriesTable.v7"
+            autosaveName: "local.codex.cleanzip.archiveEntriesTable.v13"
         )
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("name", L10n.tr("column.name"), 380, 180, .greatestFiniteMagnitude),
+            ("name", L10n.tr("column.name"), 360, 180, .greatestFiniteMagnitude),
             ("size", L10n.tr("column.size"), 140, 96, 280),
             ("modified", L10n.tr("column.modified"), 240, 190, 2000)
         ]
@@ -1144,12 +1088,12 @@ struct ArchiveEntriesTable: NSViewRepresentable {
             column.width = spec.2
             column.minWidth = spec.3
             column.maxWidth = spec.4
-            column.resizingMask = [.userResizingMask, .autoresizingMask]
+            column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: spec.0 == "name")
             table.addTableColumn(column)
         }
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
-        let scroll = FinderTableScrollView()
+        let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -1167,7 +1111,6 @@ struct ArchiveEntriesTable: NSViewRepresentable {
             context.coordinator.filter = filter
             table.reloadData()
         }
-        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 
@@ -1220,17 +1163,6 @@ struct SelectedItemsTable: NSViewRepresentable {
             if selectedIDs.wrappedValue != selection {
                 selectedIDs.wrappedValue = selection
             }
-        }
-
-        func tableViewColumnDidResize(_ notification: Notification) {
-            guard let tableView = notification.object as? NSTableView else { return }
-            let resizedColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport(resizedColumn: resizedColumn)
-        }
-
-        func tableViewColumnDidMove(_ notification: Notification) {
-            guard let tableView = notification.object as? NSTableView else { return }
-            (tableView.enclosingScrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
         }
 
         func tableView(_ tableView: NSTableView, shouldReorderColumn columnIndex: Int, toColumn newColumnIndex: Int) -> Bool {
@@ -1335,14 +1267,14 @@ struct SelectedItemsTable: NSViewRepresentable {
         FinderTableBehavior.configure(
             table,
             allowsMultipleSelection: true,
-            autosaveName: "local.codex.cleanzip.selectedItemsTable.v7"
+            autosaveName: "local.codex.cleanzip.selectedItemsTable.v13"
         )
 
         let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("selectedName", L10n.tr("column.name"), 260, 180, .greatestFiniteMagnitude),
-            ("selectedType", L10n.tr("column.type"), 90, 70, 160),
-            ("selectedSize", L10n.tr("column.size"), 120, 90, 220),
-            ("selectedLocation", L10n.tr("column.location"), 360, 220, 2000)
+            ("selectedName", L10n.tr("column.name"), 230, 180, .greatestFiniteMagnitude),
+            ("selectedType", L10n.tr("column.type"), 80, 70, 160),
+            ("selectedSize", L10n.tr("column.size"), 100, 90, 220),
+            ("selectedLocation", L10n.tr("column.location"), 330, 220, 2000)
         ]
         for spec in columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.0))
@@ -1350,13 +1282,13 @@ struct SelectedItemsTable: NSViewRepresentable {
             column.width = spec.2
             column.minWidth = spec.3
             column.maxWidth = spec.4
-            column.resizingMask = [.userResizingMask, .autoresizingMask]
+            column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: spec.0 == "selectedName")
             table.addTableColumn(column)
         }
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
 
-        let scroll = FinderTableScrollView()
+        let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -1381,7 +1313,6 @@ struct SelectedItemsTable: NSViewRepresentable {
                 context.coordinator.applySelection(to: table)
             }
         }
-        (scrollView as? FinderTableScrollView)?.rebalanceColumnsToViewport()
     }
 }
 
