@@ -43,6 +43,7 @@ def configure_target(target, info_plist, bundle_id, executable_name, product_nam
     config.build_settings["CODE_SIGN_STYLE"] = "Manual"
     config.build_settings["COMBINE_HIDPI_IMAGES"] = "YES"
     config.build_settings["DEVELOPMENT_TEAM"] = ""
+    config.build_settings["ENABLE_HARDENED_RUNTIME"] = "YES"
     config.build_settings["GENERATE_INFOPLIST_FILE"] = "NO"
     config.build_settings["INFOPLIST_FILE"] = info_plist
     config.build_settings["LD_RUNPATH_SEARCH_PATHS"] = "$(inherited) @executable_path/../Frameworks"
@@ -52,7 +53,8 @@ def configure_target(target, info_plist, bundle_id, executable_name, product_nam
     config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = bundle_id
     config.build_settings["PRODUCT_NAME"] = product_name
     config.build_settings["SDKROOT"] = "macosx"
-    config.build_settings["SWIFT_VERSION"] = "5.0"
+    config.build_settings["SWIFT_STRICT_CONCURRENCY"] = "complete"
+    config.build_settings["SWIFT_VERSION"] = "6.0"
     config.build_settings["WRAPPER_EXTENSION"] = wrapper_extension
 
     if config.name == "Release"
@@ -124,6 +126,8 @@ configure_target(
 project.build_configurations.each do |config|
   config.build_settings["MACOSX_DEPLOYMENT_TARGET"] = "14.0"
   config.build_settings["SDKROOT"] = "macosx"
+  config.build_settings["SWIFT_STRICT_CONCURRENCY"] = "complete"
+  config.build_settings["SWIFT_VERSION"] = "6.0"
 end
 
 [app_target, service_target].each do |target|

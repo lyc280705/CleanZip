@@ -6,7 +6,7 @@ on:
       release_tag:
         description: "Release tag to update"
         required: true
-        default: "v2.6.34"
+        default: "v2.6.35"
       upload_release:
         description: "Upload pkg, zip, and checksums to the release"
         required: true
@@ -122,16 +122,135 @@ jobs:
           print("Assets.car contains a dynamic app icon image stack.")
           PY
 
+      - name: Configure Developer ID signing
+        env:
+          APPLICATION_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          APPLICATION_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+          APPLICATION_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_IDENTITY }}
+          INSTALLER_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          INSTALLER_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_P12_PASSWORD }}
+          INSTALLER_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_IDENTITY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$APPLICATION_P12_BASE64" || -z "$APPLICATION_P12_PASSWORD" || -z "$APPLICATION_IDENTITY" || \
+                -z "$INSTALLER_P12_BASE64" || -z "$INSTALLER_P12_PASSWORD" || -z "$INSTALLER_IDENTITY" ]]; then
+            echo "CLEANZIP_SIGNING_MODE=ad-hoc" >> "$GITHUB_ENV"
+            echo "::notice::Developer ID secrets are incomplete; this build will be ad-hoc signed and cannot be notarized."
+            exit 0
+          fi
+
+          keychain="$RUNNER_TEMP/cleanzip-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          application_p12="$RUNNER_TEMP/developer-id-application.p12"
+          installer_p12="$RUNNER_TEMP/developer-id-installer.p12"
+          printf '%s' "$APPLICATION_P12_BASE64" | /usr/bin/base64 -D > "$application_p12"
+          printf '%s' "$INSTALLER_P12_BASE64" | /usr/bin/base64 -D > "$installer_p12"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$application_p12" -k "$keychain" -P "$APPLICATION_P12_PASSWORD" -T /usr/bin/codesign
+          security import "$installer_p12" -k "$keychain" -P "$INSTALLER_P12_PASSWORD" -T /usr/bin/productbuild -T /usr/bin/pkgbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+
+          echo "CLEANZIP_SIGNING_MODE=developer-id" >> "$GITHUB_ENV"
+          echo "CLEANZIP_SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "CLEANZIP_APPLICATION_IDENTITY=$APPLICATION_IDENTITY" >> "$GITHUB_ENV"
+          echo "CLEANZIP_INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> "$GITHUB_ENV"
+
       - name: Sign app bundles
         shell: bash
         run: |
           set -euo pipefail
-          codesign --force --deep --sign - work/CleanZipBuild/CleanZip.app
-          codesign --force --deep --sign - work/CleanZipBuild/CleanZipService.service
+          sign_bundle() {
+            local bundle="$1"
+            local helper="$bundle/Contents/Resources/7zz"
+            if [[ "$CLEANZIP_SIGNING_MODE" == "developer-id" ]]; then
+              codesign --force --options runtime --timestamp --keychain "$CLEANZIP_SIGNING_KEYCHAIN" --sign "$CLEANZIP_APPLICATION_IDENTITY" "$helper"
+              codesign --force --options runtime --timestamp --keychain "$CLEANZIP_SIGNING_KEYCHAIN" --sign "$CLEANZIP_APPLICATION_IDENTITY" "$bundle"
+            else
+              codesign --force --options runtime --timestamp=none --sign - "$helper"
+              codesign --force --options runtime --timestamp=none --sign - "$bundle"
+            fi
+            codesign --verify --deep --strict --verbose=2 "$bundle"
+          }
+          sign_bundle work/CleanZipBuild/CleanZip.app
+          sign_bundle work/CleanZipBuild/CleanZipService.service
+
+      - name: Notarize and staple app bundles
+        env:
+          NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CLEANZIP_SIGNING_MODE" != "developer-id" || -z "$NOTARY_KEY_P8_BASE64" || -z "$NOTARY_KEY_ID" || -z "$NOTARY_ISSUER_ID" ]]; then
+            echo "CLEANZIP_NOTARIZED=0" >> "$GITHUB_ENV"
+            echo "::notice::Notary credentials are unavailable; app bundles were not notarized."
+            exit 0
+          fi
+
+          notary_key="$RUNNER_TEMP/AuthKey.p8"
+          notary_stage="$RUNNER_TEMP/cleanzip-notary"
+          notary_zip="$RUNNER_TEMP/CleanZip-notary-upload.zip"
+          printf '%s' "$NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key"
+          mkdir -p "$notary_stage"
+          ditto work/CleanZipBuild/CleanZip.app "$notary_stage/CleanZip.app"
+          ditto work/CleanZipBuild/CleanZipService.service "$notary_stage/CleanZipService.service"
+          ditto -c -k --keepParent "$notary_stage" "$notary_zip"
+          xcrun notarytool submit "$notary_zip" --key "$notary_key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+          xcrun stapler staple work/CleanZipBuild/CleanZip.app
+          xcrun stapler validate work/CleanZipBuild/CleanZip.app
+          xcrun stapler staple work/CleanZipBuild/CleanZipService.service || echo "::notice::The service ticket remains available online."
+          spctl --assess --type execute --verbose=2 work/CleanZipBuild/CleanZip.app
+          echo "CLEANZIP_NOTARIZED=1" >> "$GITHUB_ENV"
 
       - name: Build installer package
         shell: bash
         run: work/CleanZipBuild/src/package.sh
+
+      - name: Notarize and staple installer package
+        if: ${{ env.CLEANZIP_NOTARIZED == '1' }}
+        env:
+          NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notary_key="$RUNNER_TEMP/AuthKey.p8"
+          pkg="$(find work/CleanZipBuild/dist -maxdepth 1 -name 'CleanZip-*.pkg' -print | sort | tail -n 1)"
+          test -f "$pkg"
+          printf '%s' "$NOTARY_KEY_P8_BASE64" | /usr/bin/base64 -D > "$notary_key"
+          xcrun notarytool submit "$pkg" --key "$notary_key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+          xcrun stapler staple "$pkg"
+          xcrun stapler validate "$pkg"
+          pkgutil --check-signature "$pkg"
+          spctl --assess --type install --verbose=2 "$pkg"
+
+      - name: Summarize distribution trust
+        shell: bash
+        run: |
+          {
+            echo "### CleanZip distribution"
+            echo ""
+            echo "- Signing mode: \`$CLEANZIP_SIGNING_MODE\`"
+            echo "- Notarized: \`${CLEANZIP_NOTARIZED:-0}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refresh release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work/CleanZipBuild/dist
+          pkg="$(find . -maxdepth 1 -name 'CleanZip-*.pkg' -print | sort | tail -n 1)"
+          zip="$(find . -maxdepth 1 -name 'CleanZip-*.zip' -print | sort | tail -n 1)"
+          test -f "$pkg"
+          test -f "$zip"
+          shasum -a 256 "${pkg#./}" "${zip#./}" > SHA256SUMS.txt
 
       - name: Upload package assets to release
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_release }}

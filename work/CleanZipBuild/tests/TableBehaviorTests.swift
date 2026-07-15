@@ -8,14 +8,19 @@ struct TableBehaviorTests {
 
     static func main() {
         _ = NSApplication.shared
+        testMainMenuConfiguration()
         testNativeTableConfiguration()
         testArchiveColumnReorderingPolicy()
         testSelectedItemsColumnReorderingPolicy()
         testNativeColumnSizing()
         testSelectedItemMetadataSnapshot()
         testProgressPublishingIsDeduplicated()
+        testStaleOperationCallbacksAreIgnored()
         testArchiveDerivedStateIsCached()
+        testSplitSizeValidation()
         testArchiveEngineRoundTrips()
+        testEncryptedArchivePasswordFlow()
+        testPreCancelledOperationDoesNotCreateOutput()
 
         if failures.isEmpty {
             print("PASS: CleanZip table behavior tests")
@@ -24,6 +29,24 @@ struct TableBehaviorTests {
 
         failures.forEach { fputs("FAIL: \($0)\n", stderr) }
         exit(EXIT_FAILURE)
+    }
+
+    private static func testMainMenuConfiguration() {
+        let delegate = AppDelegate()
+        delegate.configureMainMenu()
+
+        guard let mainMenu = NSApp.mainMenu else {
+            failures.append("the app should install a standard main menu")
+            return
+        }
+        expect(mainMenu.items.count == 6, "the main menu should include app, File, Edit, View, Window, and Help menus")
+        expect(NSApp.servicesMenu != nil, "the app menu should register a Services submenu")
+        expect(NSApp.windowsMenu != nil, "the Window menu should be registered with NSApplication")
+
+        let fileMenu = mainMenu.items.dropFirst().first?.submenu
+        let openItem = fileMenu?.items.first
+        expect(openItem?.keyEquivalent == "o", "Open Archive should use the standard Command-O shortcut")
+        expect(openItem?.keyEquivalentModifierMask == [.command], "Open Archive should use Command-O without extra modifiers")
     }
 
     private static func testNativeTableConfiguration() {
@@ -144,6 +167,19 @@ struct TableBehaviorTests {
         expect(state.operationProgress?.fraction == 0.006, "progress within the same displayed percent should be deduplicated")
     }
 
+    private static func testStaleOperationCallbacksAreIgnored() {
+        let state = AppState()
+        let staleOperation = state.beginOperation(title: "Old", detail: "")
+        let activeOperation = state.beginOperation(title: "New", detail: "")
+
+        state.updateOperationProgress(0.75, for: staleOperation)
+        expect(state.operationProgress?.title == "New", "a stale progress callback must not replace the active operation")
+        expect(state.operationProgress?.fraction == 0, "a stale progress callback must not advance the active operation")
+        expect(!state.finishOperation(status: "Old finished", for: staleOperation), "a stale completion must be rejected")
+        expect(state.isBusy, "a stale completion must not clear the active busy state")
+        expect(state.finishOperation(status: "New finished", for: activeOperation), "the active completion should be accepted")
+    }
+
     private static func testArchiveDerivedStateIsCached() {
         let state = AppState()
         state.entries = [
@@ -160,6 +196,25 @@ struct TableBehaviorTests {
         state.beginOperation(title: "Test", detail: "")
         state.updateOperationProgress(0.5)
         expect(state.filteredEntries.map(\.path) == ["Folder/keep.txt"], "progress updates must not rebuild archive search results")
+    }
+
+    private static func testSplitSizeValidation() {
+        let state = AppState()
+        guard let customPreset = SplitPreset.all.first(where: { $0.id == "custom" }) else {
+            failures.append("the custom split preset should exist")
+            return
+        }
+        state.splitPreset = customPreset
+
+        state.customSplitMB = "100"
+        expect(state.isSplitConfigurationValid, "a positive whole-number split size should be valid")
+        expect(state.resolvedSplitSpec() == "100m", "a valid custom split size should resolve to a 7-Zip volume spec")
+
+        for invalidValue in ["", "0", "-1", "1.5", "letters", "1048577"] {
+            state.customSplitMB = invalidValue
+            expect(!state.isSplitConfigurationValid, "custom split size '\(invalidValue)' should be rejected")
+            expect(state.resolvedSplitSpec() == nil, "an invalid custom split size must not silently create an unsplit archive")
+        }
     }
 
     private static func testArchiveEngineRoundTrips() {
@@ -200,6 +255,88 @@ struct TableBehaviorTests {
         try ArchiveEngine.shared.testArchive(firstVolume)
         let entries = try ArchiveEngine.shared.listArchive(firstVolume)
         expect(entries.allSatisfy { isCleanArchivePath($0.path) }, "split \(format.rawValue) should exclude macOS metadata")
+    }
+
+    private static func testEncryptedArchivePasswordFlow() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cleanzip-password-tests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let source = root.appendingPathComponent("secret.txt")
+            let archive = root.appendingPathComponent("encrypted.7z")
+            try Data("confidential".utf8).write(to: source)
+            guard let sevenZip = ArchiveEngine.shared.sevenZipURL else {
+                failures.append("7zz should be available for encrypted archive tests")
+                return
+            }
+            try runTool(sevenZip, arguments: ["a", "-t7z", "-pcorrect-password", "-mhe=on", archive.path, source.lastPathComponent], currentDirectory: root)
+
+            do {
+                _ = try ArchiveEngine.shared.listArchive(archive)
+                failures.append("a header-encrypted archive should request a password")
+            } catch ArchiveError.passwordRequired {
+                // Expected.
+            } catch {
+                failures.append("a missing password should be classified, got: \(error.localizedDescription)")
+            }
+
+            do {
+                _ = try ArchiveEngine.shared.listArchive(archive, password: "wrong-password")
+                failures.append("an incorrect archive password should fail")
+            } catch ArchiveError.wrongPassword {
+                // Expected.
+            } catch {
+                failures.append("an incorrect password should be classified, got: \(error.localizedDescription)")
+            }
+
+            let entries = try ArchiveEngine.shared.listArchive(archive, password: "correct-password")
+            expect(entries.contains { $0.path == "secret.txt" }, "the correct password should reveal encrypted archive entries")
+            try ArchiveEngine.shared.testArchive(archive, password: "correct-password")
+            let extracted = try ArchiveEngine.shared.extract(archive: archive, password: "correct-password")
+            expect(FileManager.default.fileExists(atPath: extracted.appendingPathComponent("secret.txt").path), "the correct password should extract the encrypted archive")
+        } catch {
+            failures.append("encrypted archive flow failed: \(error.localizedDescription)")
+        }
+    }
+
+    private static func testPreCancelledOperationDoesNotCreateOutput() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cleanzip-cancel-tests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let source = root.appendingPathComponent("cancel-me.txt")
+            try Data("cancel".utf8).write(to: source)
+            let cancellation = OperationCancellation()
+            cancellation.cancel()
+            do {
+                _ = try ArchiveEngine.shared.compress(urls: [source], format: .zip, splitSpec: nil, cancellation: cancellation)
+                failures.append("a pre-cancelled compression should not run")
+            } catch ArchiveError.cancelled {
+                // Expected.
+            }
+            expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("cancel-me.zip").path), "cancelled compression must not leave a partial archive")
+        } catch {
+            failures.append("cancellation cleanup test failed: \(error.localizedDescription)")
+        }
+    }
+
+    private static func runTool(_ executable: URL, arguments: [String], currentDirectory: URL) throws {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.currentDirectoryURL = currentDirectory
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        let errorPipe = Pipe()
+        process.standardError = errorPipe
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let message = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            throw ArchiveError.failed(message)
+        }
     }
 
     private static func makePayload(in directory: URL) throws -> URL {
