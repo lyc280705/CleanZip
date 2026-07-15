@@ -30,7 +30,7 @@ for arch in $ARCHS; do
   app_slice="$BUILD_DIR/CleanZip.${arch}"
   service_slice="$BUILD_DIR/CleanZipService.${arch}"
 
-  xcrun swiftc -O -parse-as-library \
+  xcrun swiftc -O -parse-as-library -swift-version 6 -strict-concurrency=complete -warn-concurrency \
     -target "$target" \
     -framework AppKit \
     -framework SwiftUI \
@@ -40,7 +40,7 @@ for arch in $ARCHS; do
     "$ROOT/src/main.swift" \
     -o "$app_slice"
 
-  xcrun swiftc -O -parse-as-library \
+  xcrun swiftc -O -parse-as-library -swift-version 6 -strict-concurrency=complete -warn-concurrency \
     -target "$target" \
     -framework AppKit \
     -framework UserNotifications \
@@ -62,8 +62,8 @@ fi
 chmod +x "$APP/Contents/MacOS/CleanZip" "$SERVICE/Contents/MacOS/CleanZipService"
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $DEPLOYMENT_TARGET" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $DEPLOYMENT_TARGET" "$SERVICE/Contents/Info.plist"
-codesign --force --deep --sign - "$APP"
-codesign --force --deep --sign - "$SERVICE"
+codesign --force --deep --options runtime --timestamp=none --sign - "$APP"
+codesign --force --deep --options runtime --timestamp=none --sign - "$SERVICE"
 
 echo "Built $APP"
 echo "Built $SERVICE"

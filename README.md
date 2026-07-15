@@ -13,7 +13,7 @@
   ·
   <a href="https://lyc280705.github.io/CleanZip/">Product page</a>
   ·
-  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.34">CleanZip 2.6.34</a>
+  <a href="https://github.com/lyc280705/CleanZip/releases/tag/v2.6.35">CleanZip 2.6.35</a>
   ·
   <a href="#build-from-source">Build from source</a>
 </p>
@@ -59,7 +59,7 @@ It is intentionally small: no always-on background app, no history database, no 
 
 ## Download
 
-Download `CleanZip-2.6.34.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
+Download `CleanZip-2.6.35.pkg` from the [latest release](https://github.com/lyc280705/CleanZip/releases/latest). For most users, the `.pkg` installer is the easiest option.
 
 The installer places:
 
@@ -70,9 +70,9 @@ CleanZip is ad-hoc signed for open source distribution, but it is not notarized 
 
 For the `.pkg` installer:
 
-1. In Finder, Control-click `CleanZip-2.6.34.pkg` and choose **Open**.
+1. In Finder, Control-click `CleanZip-2.6.35.pkg` and choose **Open**.
 2. If the same warning still appears with only **Done** and **Move to Trash**, open **System Settings** -> **Privacy & Security**.
-3. At the bottom of Privacy & Security, choose **Open Anyway** for `CleanZip-2.6.34.pkg`, then confirm.
+3. At the bottom of Privacy & Security, choose **Open Anyway** for `CleanZip-2.6.35.pkg`, then confirm.
 
 After installation, if macOS blocks `CleanZip.app` itself, Control-click `CleanZip.app` in `/Applications` and choose **Open**. If it is still blocked, use **System Settings** -> **Privacy & Security** -> **Open Anyway** for `CleanZip.app`.
 
@@ -81,11 +81,11 @@ After you approve the installer or app once, macOS opens it normally.
 Advanced terminal alternative for the downloaded package:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Downloads/CleanZip-2.6.34.pkg
-open ~/Downloads/CleanZip-2.6.34.pkg
+xattr -dr com.apple.quarantine ~/Downloads/CleanZip-2.6.35.pkg
+open ~/Downloads/CleanZip-2.6.35.pkg
 ```
 
-Manual installation is also available from `CleanZip-2.6.34.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
+Manual installation is also available from `CleanZip-2.6.35.zip`: move `CleanZip.app` to `/Applications` and `CleanZipService.service` to `/Library/Services`.
 
 ## Compatibility
 
@@ -100,9 +100,10 @@ On macOS 26, CleanZip uses Liquid Glass interface effects where available. On ma
 | Clean compression | Creates clean ZIP output and excludes `.DS_Store`, `__MACOSX/`, and `._*` metadata. |
 | Finder integration | Adds one right-click service for compressing ordinary files/folders or extracting archives. |
 | Archive preview | Lists archive contents with name, size, modified time, and folder structure. Includes search. |
+| Encrypted archives | Requests passwords in a native secure field; passwords are sent to `7zz` through standard input and never placed in process arguments. |
 | Extraction | Extracts common formats through bundled `7zz` and system tools. |
 | Split archive creation | Supports split ZIP and split 7Z creation with common presets and custom sizes. |
-| Progress | Shows progress for larger compression and extraction jobs in the app and lightweight service HUD. |
+| Progress | Shows cancellable progress for larger compression and extraction jobs in the app and lightweight service HUD, then removes partial output after cancellation. |
 | Compatibility | Universal app for supported Intel and Apple Silicon Macs running macOS 14 or later. |
 | Localization | Localized app UI, Finder service menu, notifications, errors, and document metadata. |
 
@@ -151,6 +152,7 @@ CleanZip runs locally on your Mac. Archive operations are performed with local s
 - `work/CleanZipBuild/src/build_xcode.sh`: Xcode release build script for the app and Finder service.
 - `work/CleanZipBuild/src/build.sh`: lightweight local Swift build fallback for Macs without full Xcode.
 - `work/CleanZipBuild/src/package.sh`: package and ZIP release artifact script.
+- `docs/RELEASING.md`: optional Developer ID signing and Apple notarization setup for maintainers.
 - `work/CleanZipBuild/src/generate_filled_icon.py`: vector icon generator and `Assets.car` compiler when Xcode `actool` is available.
 - `.github/workflows/cleanzip-liquid-glass-icon.yml`: macOS 26 GitHub Actions release build that uses full Xcode, compiles the dynamic icon stack, packages CleanZip, and can update release assets.
 
@@ -172,7 +174,7 @@ gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref m
 To rebuild and update an existing GitHub release asset set:
 
 ```sh
-gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main -f release_tag=v2.6.34 -f upload_release=true
+gh workflow run cleanzip-liquid-glass-icon.yml --repo lyc280705/CleanZip --ref main -f release_tag=v2.6.35 -f upload_release=true
 ```
 
 Lightweight local fallback with Command Line Tools:
@@ -181,7 +183,7 @@ Lightweight local fallback with Command Line Tools:
 work/CleanZipBuild/src/build.sh
 ```
 
-Dynamic Liquid Glass icon compilation requires Xcode 26 `actool`. The lightweight fallback still creates a usable app bundle, but the GitHub Actions/Xcode path is the canonical release path.
+Dynamic Liquid Glass icon compilation requires Xcode 26 `actool`. The lightweight fallback still creates a usable app bundle, but the GitHub Actions/Xcode path is the canonical release path. Both paths compile in Swift 6 language mode with complete concurrency checking; long-running archive work uses Swift 6.2 structured concurrency to stay off the main actor.
 
 ## License
 

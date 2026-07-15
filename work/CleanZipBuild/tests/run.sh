@@ -7,7 +7,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT
 
 target="$(uname -m)-apple-macos14.0"
 
-xcrun swiftc -Onone -parse-as-library -DCLEANZIP_TESTING \
+xcrun swiftc -Onone -parse-as-library -swift-version 6 -strict-concurrency=complete -warn-concurrency -DCLEANZIP_TESTING \
   -target "$target" \
   -framework AppKit \
   -framework SwiftUI \

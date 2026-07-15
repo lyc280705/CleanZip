@@ -53,14 +53,21 @@ exit 0
 SCRIPT
 chmod +x "$SCRIPTS_DIR/postinstall"
 
-pkgbuild \
-  --root "$ROOT_DIR" \
-  --component-plist "$COMPONENT_PLIST" \
-  --scripts "$SCRIPTS_DIR" \
-  --identifier "local.codex.cleanzip.pkg" \
-  --version "$PACKAGE_VERSION" \
-  --install-location "/" \
-  "$DIST/$PKG_NAME"
+pkgbuild_args=(
+  --root "$ROOT_DIR"
+  --component-plist "$COMPONENT_PLIST"
+  --scripts "$SCRIPTS_DIR"
+  --identifier "local.codex.cleanzip.pkg"
+  --version "$PACKAGE_VERSION"
+  --install-location "/"
+)
+if [[ -n "${CLEANZIP_INSTALLER_IDENTITY:-}" ]]; then
+  pkgbuild_args+=(--sign "$CLEANZIP_INSTALLER_IDENTITY")
+  if [[ -n "${CLEANZIP_SIGNING_KEYCHAIN:-}" ]]; then
+    pkgbuild_args+=(--keychain "$CLEANZIP_SIGNING_KEYCHAIN")
+  fi
+fi
+pkgbuild "${pkgbuild_args[@]}" "$DIST/$PKG_NAME"
 
 PACKAGE_VERIFY_DIR="$DIST/pkgverify"
 pkgutil --expand "$DIST/$PKG_NAME" "$PACKAGE_VERIFY_DIR"

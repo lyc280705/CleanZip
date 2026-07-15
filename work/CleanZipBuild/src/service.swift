@@ -1,5 +1,5 @@
-import AppKit
-import QuartzCore
+@preconcurrency import AppKit
+@preconcurrency import QuartzCore
 @preconcurrency import UserNotifications
 
 enum L10n {
@@ -18,13 +18,13 @@ enum L10n {
     }
 }
 
-struct ProcessResult {
+struct ProcessResult: Sendable {
     let status: Int32
     let stdout: String
     let stderr: String
 }
 
-private final class DataBuffer {
+private final class DataBuffer: @unchecked Sendable {
     private var data = Data()
     private let lock = NSLock()
 
@@ -41,22 +41,68 @@ private final class DataBuffer {
     }
 }
 
-enum ArchiveError: Error, LocalizedError {
+final class OperationCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func register(_ process: Process) {
+        let shouldTerminate = lock.withLock {
+            self.process = process
+            return cancelled
+        }
+        if shouldTerminate, process.isRunning { process.terminate() }
+    }
+
+    func unregister(_ process: Process) {
+        lock.withLock {
+            if self.process === process { self.process = nil }
+        }
+    }
+
+    func cancel() {
+        let runningProcess = lock.withLock {
+            cancelled = true
+            return process
+        }
+        if let runningProcess, runningProcess.isRunning { runningProcess.terminate() }
+    }
+
+    func checkCancellation() throws {
+        if isCancelled { throw ArchiveError.cancelled }
+    }
+}
+
+enum ArchiveError: Error, LocalizedError, Sendable {
     case missingTool(String)
     case failed(String)
+    case passwordRequired
+    case wrongPassword
+    case cancelled
 
     var errorDescription: String? {
         switch self {
         case .missingTool(let tool): return L10n.tr("error.missingTool", tool)
         case .failed(let message): return message
+        case .passwordRequired: return L10n.tr("error.passwordRequired")
+        case .wrongPassword: return L10n.tr("error.wrongPassword")
+        case .cancelled: return L10n.tr("error.cancelled")
         }
     }
 }
 
-final class ArchiveEngine {
+enum ServiceHandoffError: Error, Sendable {
+    case passwordRequired(URL)
+}
+
+final class ArchiveEngine: @unchecked Sendable {
     static let shared = ArchiveEngine()
     private static let progressRegex = try! NSRegularExpression(pattern: #"(?<!\d)(\d{1,3})%"#)
-    typealias ProgressHandler = (Double) -> Void
+    typealias ProgressHandler = @Sendable (Double) -> Void
     private let fileManager = FileManager.default
 
     var sevenZipURL: URL? {
@@ -80,7 +126,7 @@ final class ArchiveEngine {
         return false
     }
 
-    func compress(urls: [URL], progressHandler: ProgressHandler? = nil) throws -> URL {
+    func compress(urls: [URL], cancellation: OperationCancellation? = nil, progressHandler: ProgressHandler? = nil) throws -> URL {
         guard !urls.isEmpty else { throw ArchiveError.failed(L10n.tr("error.noItemsToCompress")) }
         let parent = urls[0].deletingLastPathComponent()
         guard urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == parent.standardizedFileURL }) else {
@@ -89,37 +135,48 @@ final class ArchiveEngine {
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: "zip")
         let itemNames = urls.map { itemNameForProcess($0) }
-        try compressWith7z(parent: parent, output: output, itemNames: itemNames, progressHandler: progressHandler)
-        return output
+        do {
+            try compressWith7z(parent: parent, output: output, itemNames: itemNames, cancellation: cancellation, progressHandler: progressHandler)
+            return output
+        } catch {
+            removePartialArchive(at: output)
+            throw error
+        }
     }
 
-    func extract(archive: URL, progressHandler: ProgressHandler? = nil) throws -> URL {
+    func extract(archive: URL, cancellation: OperationCancellation? = nil, progressHandler: ProgressHandler? = nil) throws -> URL {
         let parent = archive.deletingLastPathComponent()
         let baseName = archiveBaseName(archive)
         let outputDir = uniqueDirectoryURL(in: parent, baseName: baseName)
         try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
-        return try extractWith7z(archive: archive, outputDir: outputDir, progressHandler: progressHandler)
+        do {
+            return try extractWith7z(archive: archive, outputDir: outputDir, cancellation: cancellation, progressHandler: progressHandler)
+        } catch {
+            try? fileManager.removeItem(at: outputDir)
+            throw error
+        }
     }
 
-    private func compressWith7z(parent: URL, output: URL, itemNames: [String], progressHandler: ProgressHandler?) throws {
+    private func compressWith7z(parent: URL, output: URL, itemNames: [String], cancellation: OperationCancellation?, progressHandler: ProgressHandler?) throws {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
         var args = ["a", "-tzip", "-mx=5", "-y", "-bsp1", output.path]
         args.append(contentsOf: itemNames)
         args.append(contentsOf: ["-xr!.DS_Store", "-xr!__MACOSX", "-xr!._*"])
         var env = ProcessInfo.processInfo.environment
         env["COPYFILE_DISABLE"] = "1"
-        let result = try runProcess(executable: sevenZipURL, arguments: args, currentDirectory: parent, environment: env, progressHandler: progressHandler)
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+        let result = try runProcess(executable: sevenZipURL, arguments: args, currentDirectory: parent, environment: env, cancellation: cancellation, progressHandler: progressHandler)
+        guard result.status == 0 else { throw archiveError(for: result) }
     }
 
-    private func extractWith7z(archive: URL, outputDir: URL, progressHandler: ProgressHandler?) throws -> URL {
+    private func extractWith7z(archive: URL, outputDir: URL, cancellation: OperationCancellation?, progressHandler: ProgressHandler?) throws -> URL {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        let result = try runProcess(executable: sevenZipURL, arguments: ["x", "-y", "-bsp1", "-o\(outputDir.path)", archive.path], progressHandler: progressHandler)
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+        let result = try runProcess(executable: sevenZipURL, arguments: ["x", "-y", "-bsp1", "-o\(outputDir.path)", archive.path], cancellation: cancellation, progressHandler: progressHandler)
+        guard result.status == 0 else { throw archiveError(for: result) }
         return outputDir
     }
 
-    private func runProcess(executable: URL, arguments: [String], currentDirectory: URL? = nil, environment: [String: String]? = nil, progressHandler: ProgressHandler? = nil) throws -> ProcessResult {
+    private func runProcess(executable: URL, arguments: [String], currentDirectory: URL? = nil, environment: [String: String]? = nil, cancellation: OperationCancellation? = nil, progressHandler: ProgressHandler? = nil) throws -> ProcessResult {
+        try cancellation?.checkCancellation()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -129,6 +186,7 @@ final class ArchiveEngine {
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        process.standardInput = FileHandle.nullDevice
         let stdoutBuffer = DataBuffer()
         let stderrBuffer = DataBuffer()
         let readers = DispatchGroup()
@@ -143,9 +201,37 @@ final class ArchiveEngine {
             readers.leave()
         }
         try process.run()
+        cancellation?.register(process)
+        defer { cancellation?.unregister(process) }
         process.waitUntilExit()
         readers.wait()
+        try cancellation?.checkCancellation()
         return ProcessResult(status: process.terminationStatus, stdout: stdoutBuffer.string, stderr: stderrBuffer.string)
+    }
+
+    private func archiveError(for result: ProcessResult) -> ArchiveError {
+        let message = [result.stdout, result.stderr].filter { !$0.isEmpty }.joined(separator: "\n")
+        let lowercased = message.lowercased()
+        if lowercased.contains("wrong password") { return .wrongPassword }
+        if lowercased.contains("enter password") || lowercased.contains("password is required") {
+            return .passwordRequired
+        }
+        return .failed(message.isEmpty ? L10n.tr("error.unknownArchiveFailure") : message)
+    }
+
+    private func removePartialArchive(at output: URL) {
+        try? fileManager.removeItem(at: output)
+        let directory = output.deletingLastPathComponent()
+        let volumePrefix = output.lastPathComponent + "."
+        guard let candidates = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for candidate in candidates {
+            let name = candidate.lastPathComponent
+            guard name.hasPrefix(volumePrefix) else { continue }
+            let suffix = name.dropFirst(volumePrefix.count)
+            if suffix.count == 3, suffix.allSatisfy(\.isNumber) {
+                try? fileManager.removeItem(at: candidate)
+            }
+        }
     }
 
     private func readPipe(_ pipe: Pipe, into buffer: DataBuffer, progressHandler: ProgressHandler?) {
@@ -206,24 +292,29 @@ final class ArchiveEngine {
     }
 }
 
-final class ServiceProgressHUD {
+@MainActor
+final class ServiceProgressHUD: NSObject {
     private var panel: NSPanel?
     private var titleField: NSTextField?
     private var detailField: NSTextField?
     private var percentField: NSTextField?
     private var progressIndicator: NSProgressIndicator?
+    private var cancelButton: NSButton?
     private var scheduledShow: DispatchWorkItem?
+    private var cancelHandler: (() -> Void)?
     private var title = L10n.tr("operation.processing")
     private var detail = ""
     private var fraction = 0.0
     private var finished = false
 
-    func begin(title: String, detail: String) {
+    func begin(title: String, detail: String, onCancel: (() -> Void)? = nil) {
         scheduledShow?.cancel()
         self.title = title
         self.detail = detail
+        cancelHandler = onCancel
         fraction = 0
         finished = false
+        cancelButton?.isEnabled = true
         updateVisibleControls()
         let workItem = DispatchWorkItem { [weak self] in self?.showIfNeeded() }
         scheduledShow = workItem
@@ -239,6 +330,7 @@ final class ServiceProgressHUD {
 
     func finish() {
         finished = true
+        cancelHandler = nil
         scheduledShow?.cancel()
         scheduledShow = nil
         fraction = 1
@@ -332,13 +424,23 @@ final class ServiceProgressHUD {
         percentField.textColor = .secondaryLabelColor
         percentField.alignment = .right
 
+        let cancelButton = NSButton(
+            image: NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.tr("button.cancelOperation")) ?? NSImage(),
+            target: self,
+            action: #selector(cancelOperation(_:))
+        )
+        cancelButton.bezelStyle = .circular
+        cancelButton.controlSize = .small
+        cancelButton.toolTip = L10n.tr("button.cancelOperation")
+        cancelButton.isHidden = cancelHandler == nil
+
         let textStack = NSStackView(views: [titleField, detailField])
         textStack.orientation = .vertical
         textStack.spacing = 2
         textStack.alignment = .leading
         textStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let bottomStack = NSStackView(views: [progressIndicator, percentField])
+        let bottomStack = NSStackView(views: [progressIndicator, percentField, cancelButton])
         bottomStack.orientation = .horizontal
         bottomStack.spacing = 10
         bottomStack.alignment = .centerY
@@ -355,7 +457,7 @@ final class ServiceProgressHUD {
             bottomStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             bottomStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             bottomStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -18),
-            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 190),
             percentField.widthAnchor.constraint(equalToConstant: 42)
         ])
 
@@ -363,6 +465,7 @@ final class ServiceProgressHUD {
         self.detailField = detailField
         self.percentField = percentField
         self.progressIndicator = progressIndicator
+        self.cancelButton = cancelButton
         position(panel)
         return panel
     }
@@ -393,13 +496,13 @@ final class ServiceProgressHUD {
         }
     }
 
-    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
+    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (@MainActor @Sendable () -> Void)? = nil) {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: alpha > panel.alphaValue ? .easeOut : .easeIn)
             panel.animator().alphaValue = alpha
         } completionHandler: {
-            completion?()
+            Task { @MainActor in completion?() }
         }
     }
 
@@ -408,21 +511,29 @@ final class ServiceProgressHUD {
         detailField?.stringValue = detail
         progressIndicator?.doubleValue = fraction
         percentField?.stringValue = percentText
+        cancelButton?.isHidden = cancelHandler == nil
+    }
+
+    @objc private func cancelOperation(_ sender: NSButton) {
+        sender.isEnabled = false
+        title = L10n.tr("status.cancelling")
+        updateVisibleControls()
+        cancelHandler?()
     }
 }
 
 @MainActor
 final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let hud = ServiceProgressHUD()
+    private var cancellation: OperationCancellation?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
 
@@ -438,7 +549,10 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
         let shouldExtract = urls.allSatisfy { ArchiveEngine.shared.isArchive($0) }
         let title = shouldExtract ? L10n.tr("operation.extracting") : L10n.tr("operation.compressing")
         let detail = urls.count == 1 ? urls[0].lastPathComponent : (shouldExtract ? L10n.archiveCount(urls.count) : L10n.itemCount(urls.count))
-        hud.begin(title: title, detail: detail)
+        prepareNotificationsForOperation()
+        let cancellation = OperationCancellation()
+        self.cancellation = cancellation
+        hud.begin(title: title, detail: detail) { cancellation.cancel() }
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -447,20 +561,33 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
                     for (index, url) in urls.enumerated() {
                         let base = Double(index) / Double(urls.count)
                         let scale = 1 / Double(urls.count)
-                        outputs.append(try ArchiveEngine.shared.extract(archive: url) { fraction in
-                            DispatchQueue.main.async {
-                                self.hud.update(fraction: base + fraction * scale, detail: url.lastPathComponent)
+                        do {
+                            outputs.append(try ArchiveEngine.shared.extract(archive: url, cancellation: cancellation) { fraction in
+                                DispatchQueue.main.async {
+                                    self.hud.update(fraction: base + fraction * scale, detail: url.lastPathComponent)
+                                }
+                            })
+                        } catch let archiveError as ArchiveError {
+                            switch archiveError {
+                            case .passwordRequired, .wrongPassword:
+                                throw ServiceHandoffError.passwordRequired(url)
+                            default:
+                                throw archiveError
                             }
-                        })
+                        }
                     }
                     let message = outputs.count == 1 ? L10n.tr("notification.extractedTo", outputs[0].lastPathComponent) : L10n.tr("notification.extractedArchives", L10n.archiveCount(outputs.count))
                     DispatchQueue.main.async { self.finish(message: message) }
                 } else {
-                    let output = try ArchiveEngine.shared.compress(urls: urls) { fraction in
+                    let output = try ArchiveEngine.shared.compress(urls: urls, cancellation: cancellation) { fraction in
                         DispatchQueue.main.async { self.hud.update(fraction: fraction) }
                     }
                     DispatchQueue.main.async { self.finish(message: L10n.tr("notification.created", output.lastPathComponent)) }
                 }
+            } catch ServiceHandoffError.passwordRequired(let url) {
+                DispatchQueue.main.async { self.handoffPasswordArchive(url) }
+            } catch ArchiveError.cancelled {
+                DispatchQueue.main.async { self.finish(message: L10n.tr("status.cancelled")) }
             } catch {
                 DispatchQueue.main.async { self.finish(title: L10n.tr("notification.operationFailedTitle"), message: error.localizedDescription) }
             }
@@ -468,20 +595,66 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
     }
 
     private func finish(title: String = "CleanZip", message: String) {
+        cancellation = nil
         hud.finish()
         notify(title: title, message: message) {
             NSApp.terminate(nil)
         }
     }
 
-    private func notify(title: String, message: String, completion: @escaping () -> Void) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = message
-        content.sound = .default
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: completion)
+    private func handoffPasswordArchive(_ url: URL) {
+        cancellation = nil
+        hud.finish()
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "local.codex.cleanzip") else {
+            finish(title: L10n.tr("notification.operationFailedTitle"), message: L10n.tr("error.mainAppUnavailable"))
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: configuration) { _, launchError in
+            DispatchQueue.main.async {
+                if let launchError {
+                    self.finish(title: L10n.tr("notification.operationFailedTitle"), message: launchError.localizedDescription)
+                } else {
+                    NSApp.terminate(nil)
+                }
+            }
+        }
+    }
+
+    private func notify(title: String, message: String, completion: @escaping @MainActor @Sendable () -> Void) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            let deliver: @Sendable () -> Void = {
+                let content = UNMutableNotificationContent()
+                content.title = title
+                content.body = message
+                content.sound = .default
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                center.add(request) { _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { completion() }
+                }
+            }
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                deliver()
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                    granted ? deliver() : DispatchQueue.main.async { completion() }
+                }
+            case .denied:
+                DispatchQueue.main.async { completion() }
+            @unknown default:
+                DispatchQueue.main.async { completion() }
+            }
+        }
+    }
+
+    private func prepareNotificationsForOperation() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
     }
 

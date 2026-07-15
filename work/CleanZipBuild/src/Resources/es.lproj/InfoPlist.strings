@@ -1,3 +1,6 @@
 "CFBundleDisplayName" = "CleanZip";
 "CFBundleName" = "CleanZip";
 "CFBundleTypeName" = "Archivo comprimido";
+"Archive" = "Archivo comprimido";
+"7-Zip Archive" = "Archivo 7-Zip";
+"RAR Archive" = "Archivo RAR";

@@ -1,8 +1,8 @@
-import AppKit
-import Combine
-import QuartzCore
-import SwiftUI
-import UniformTypeIdentifiers
+@preconcurrency import AppKit
+@preconcurrency import Combine
+@preconcurrency import QuartzCore
+@preconcurrency import SwiftUI
+@preconcurrency import UniformTypeIdentifiers
 @preconcurrency import UserNotifications
 
 enum L10n {
@@ -25,7 +25,7 @@ enum L10n {
     }
 }
 
-struct ArchiveEntry: Identifiable, Equatable {
+struct ArchiveEntry: Identifiable, Equatable, Sendable {
     let id = UUID()
     let path: String
     let size: Int64
@@ -33,7 +33,7 @@ struct ArchiveEntry: Identifiable, Equatable {
     let isDirectory: Bool
 }
 
-struct OperationProgress {
+struct OperationProgress: Sendable {
     var title: String
     var detail: String
     var fraction: Double?
@@ -48,7 +48,7 @@ extension Notification.Name {
     static let cleanZipStateDidChange = Notification.Name("local.codex.cleanzip.stateDidChange")
 }
 
-struct SelectedItem: Identifiable, Equatable {
+struct SelectedItem: Identifiable, Equatable, Sendable {
     let url: URL
     let isDirectory: Bool
     let byteSize: Int64?
@@ -74,14 +74,14 @@ struct SelectedItem: Identifiable, Equatable {
     }
 }
 
-enum ArchiveFormat: String, CaseIterable, Identifiable {
+enum ArchiveFormat: String, CaseIterable, Identifiable, Sendable {
     case zip = "ZIP"
     case sevenZ = "7Z"
     var id: String { rawValue }
     var fileExtension: String { self == .zip ? "zip" : "7z" }
 }
 
-struct SplitPreset: Identifiable, Hashable {
+struct SplitPreset: Identifiable, Hashable, Sendable {
     let id: String
     let titleKey: String
     let spec: String?
@@ -97,13 +97,13 @@ struct SplitPreset: Identifiable, Hashable {
     ]
 }
 
-struct ProcessResult {
+struct ProcessResult: Sendable {
     let status: Int32
     let stdout: String
     let stderr: String
 }
 
-private final class DataBuffer {
+private final class DataBuffer: @unchecked Sendable {
     private var data = Data()
     private let lock = NSLock()
 
@@ -120,21 +120,69 @@ private final class DataBuffer {
     }
 }
 
-enum ArchiveError: Error, LocalizedError {
+final class OperationCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func register(_ process: Process) {
+        let shouldTerminate = lock.withLock {
+            self.process = process
+            return cancelled
+        }
+        if shouldTerminate, process.isRunning { process.terminate() }
+    }
+
+    func unregister(_ process: Process) {
+        lock.withLock {
+            if self.process === process { self.process = nil }
+        }
+    }
+
+    func cancel() {
+        let runningProcess = lock.withLock {
+            cancelled = true
+            return process
+        }
+        if let runningProcess, runningProcess.isRunning { runningProcess.terminate() }
+    }
+
+    func checkCancellation() throws {
+        if isCancelled { throw ArchiveError.cancelled }
+    }
+}
+
+enum ArchiveError: Error, LocalizedError, Sendable {
     case missingTool(String)
     case failed(String)
+    case passwordRequired
+    case wrongPassword
+    case cancelled
+
     var errorDescription: String? {
         switch self {
         case .missingTool(let tool): return L10n.tr("error.missingTool", tool)
         case .failed(let message): return message
+        case .passwordRequired: return L10n.tr("error.passwordRequired")
+        case .wrongPassword: return L10n.tr("error.wrongPassword")
+        case .cancelled: return L10n.tr("error.cancelled")
         }
     }
 }
 
-final class ArchiveEngine {
+final class ArchiveEngine: @unchecked Sendable {
     static let shared = ArchiveEngine()
+    static let supportedFilenameExtensions = [
+        "zip", "7z", "rar", "tar", "tar.gz", "tgz", "tar.bz2", "tbz", "tbz2",
+        "tar.xz", "txz", "tar.zst", "tzst", "gz", "bz2", "xz", "zst",
+        "iso", "cab", "dmg", "xar", "jar", "war", "apk", "zip.001", "7z.001"
+    ]
     private static let progressRegex = try! NSRegularExpression(pattern: #"(?<!\d)(\d{1,3})%"#)
-    typealias ProgressHandler = (Double) -> Void
+    typealias ProgressHandler = @Sendable (Double) -> Void
     private let fileManager = FileManager.default
 
     var sevenZipURL: URL? {
@@ -153,31 +201,52 @@ final class ArchiveEngine {
 
     func isArchive(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        let extensions = [
-            ".zip", ".7z", ".rar", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tbz2",
-            ".tar.xz", ".txz", ".tar.zst", ".tzst", ".gz", ".bz2", ".xz", ".zst",
-            ".iso", ".cab", ".dmg", ".xar", ".jar", ".war", ".apk", ".zip.001", ".7z.001"
-        ]
-        if extensions.contains(where: { name.hasSuffix($0) }) { return true }
+        if Self.supportedFilenameExtensions.contains(where: { name.hasSuffix(".\($0)") }) { return true }
         if name.range(of: #"\.z\d{2}$"#, options: .regularExpression) != nil { return true }
         if name.range(of: #"\.r\d{2}$"#, options: .regularExpression) != nil { return true }
         return false
     }
 
-    func listArchive(_ archive: URL) throws -> [ArchiveEntry] {
+    func listArchive(_ archive: URL, password: String? = nil, cancellation: OperationCancellation? = nil) throws -> [ArchiveEntry] {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        let result = try runProcess(executable: sevenZipURL, arguments: ["l", "-slt", archive.path])
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+        let result = try runProcess(
+            executable: sevenZipURL,
+            arguments: ["l", "-slt", archive.path],
+            password: password,
+            cancellation: cancellation
+        )
+        guard result.status == 0 else { throw archiveError(for: result) }
         return parseSevenZipList(result.stdout)
     }
 
-    func testArchive(_ archive: URL) throws {
-        guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        let result = try runProcess(executable: sevenZipURL, arguments: ["t", "-y", archive.path])
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+    @concurrent
+    func listArchiveInBackground(_ archive: URL, password: String? = nil, cancellation: OperationCancellation? = nil) async throws -> [ArchiveEntry] {
+        try listArchive(archive, password: password, cancellation: cancellation)
     }
 
-    func compress(urls: [URL], format: ArchiveFormat, splitSpec: String?, progressHandler: ProgressHandler? = nil) throws -> URL {
+    func testArchive(_ archive: URL, password: String? = nil, cancellation: OperationCancellation? = nil) throws {
+        guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
+        let result = try runProcess(
+            executable: sevenZipURL,
+            arguments: ["t", "-y", archive.path],
+            password: password,
+            cancellation: cancellation
+        )
+        guard result.status == 0 else { throw archiveError(for: result) }
+    }
+
+    @concurrent
+    func testArchiveInBackground(_ archive: URL, password: String? = nil, cancellation: OperationCancellation? = nil) async throws {
+        try testArchive(archive, password: password, cancellation: cancellation)
+    }
+
+    func compress(
+        urls: [URL],
+        format: ArchiveFormat,
+        splitSpec: String?,
+        cancellation: OperationCancellation? = nil,
+        progressHandler: ProgressHandler? = nil
+    ) throws -> URL {
         guard !urls.isEmpty else { throw ArchiveError.failed(L10n.tr("error.noItemsToCompress")) }
         let parent = urls[0].deletingLastPathComponent()
         guard urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == parent.standardizedFileURL }) else {
@@ -186,30 +255,120 @@ final class ArchiveEngine {
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: format.fileExtension, splitSpec: splitSpec)
         let itemNames = urls.map { itemNameForProcess($0) }
-        try compressWith7z(parent: parent, output: output, itemNames: itemNames, archiveType: format == .zip ? "zip" : "7z", splitSpec: splitSpec, progressHandler: progressHandler)
-        return output
+        do {
+            try compressWith7z(
+                parent: parent,
+                output: output,
+                itemNames: itemNames,
+                archiveType: format == .zip ? "zip" : "7z",
+                splitSpec: splitSpec,
+                cancellation: cancellation,
+                progressHandler: progressHandler
+            )
+            return output
+        } catch {
+            removePartialArchive(at: output)
+            throw error
+        }
     }
 
-    func extract(archive: URL, progressHandler: ProgressHandler? = nil) throws -> URL {
+    @concurrent
+    func compressInBackground(
+        urls: [URL],
+        format: ArchiveFormat,
+        splitSpec: String?,
+        cancellation: OperationCancellation? = nil,
+        progressHandler: ProgressHandler? = nil
+    ) async throws -> URL {
+        try compress(
+            urls: urls,
+            format: format,
+            splitSpec: splitSpec,
+            cancellation: cancellation,
+            progressHandler: progressHandler
+        )
+    }
+
+    func extract(
+        archive: URL,
+        password: String? = nil,
+        cancellation: OperationCancellation? = nil,
+        progressHandler: ProgressHandler? = nil
+    ) throws -> URL {
         let parent = archive.deletingLastPathComponent()
         let baseName = archiveBaseName(archive)
         let outputDir = uniqueDirectoryURL(in: parent, baseName: baseName)
         try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
-        if progressHandler != nil {
-            return try extractWith7z(archive: archive, outputDir: outputDir, progressHandler: progressHandler)
-        }
-        if archive.lastPathComponent.lowercased().hasSuffix(".zip") {
-            let result = try runProcess(executable: URL(fileURLWithPath: "/usr/bin/ditto"), arguments: ["-x", "-k", archive.path, outputDir.path])
-            if result.status == 0 { return outputDir }
+        do {
+            if progressHandler != nil || password != nil {
+                return try extractWith7z(
+                    archive: archive,
+                    outputDir: outputDir,
+                    password: password,
+                    cancellation: cancellation,
+                    progressHandler: progressHandler
+                )
+            }
+            if archive.lastPathComponent.lowercased().hasSuffix(".zip") {
+                let result = try runProcess(
+                    executable: URL(fileURLWithPath: "/usr/bin/ditto"),
+                    arguments: ["-x", "-k", archive.path, outputDir.path],
+                    cancellation: cancellation
+                )
+                if result.status == 0 { return outputDir }
+                try? fileManager.removeItem(at: outputDir)
+                let fallbackDir = uniqueDirectoryURL(in: parent, baseName: baseName)
+                try fileManager.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
+                do {
+                    return try extractWith7z(
+                        archive: archive,
+                        outputDir: fallbackDir,
+                        password: password,
+                        cancellation: cancellation,
+                        progressHandler: progressHandler
+                    )
+                } catch {
+                    try? fileManager.removeItem(at: fallbackDir)
+                    throw error
+                }
+            }
+            return try extractWith7z(
+                archive: archive,
+                outputDir: outputDir,
+                password: password,
+                cancellation: cancellation,
+                progressHandler: progressHandler
+            )
+        } catch {
             try? fileManager.removeItem(at: outputDir)
-            let fallbackDir = uniqueDirectoryURL(in: parent, baseName: baseName)
-            try fileManager.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
-            return try extractWith7z(archive: archive, outputDir: fallbackDir, progressHandler: progressHandler)
+            throw error
         }
-        return try extractWith7z(archive: archive, outputDir: outputDir, progressHandler: progressHandler)
     }
 
-    private func compressWith7z(parent: URL, output: URL, itemNames: [String], archiveType: String, splitSpec: String?, progressHandler: ProgressHandler?) throws {
+    @concurrent
+    func extractInBackground(
+        archive: URL,
+        password: String? = nil,
+        cancellation: OperationCancellation? = nil,
+        progressHandler: ProgressHandler? = nil
+    ) async throws -> URL {
+        try extract(
+            archive: archive,
+            password: password,
+            cancellation: cancellation,
+            progressHandler: progressHandler
+        )
+    }
+
+    private func compressWith7z(
+        parent: URL,
+        output: URL,
+        itemNames: [String],
+        archiveType: String,
+        splitSpec: String?,
+        cancellation: OperationCancellation?,
+        progressHandler: ProgressHandler?
+    ) throws {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
         var args = ["a", "-t\(archiveType)", "-mx=5", "-y"]
         if progressHandler != nil { args.append("-bsp1") }
@@ -219,22 +378,68 @@ final class ArchiveEngine {
         args.append(contentsOf: ["-xr!.DS_Store", "-xr!__MACOSX", "-xr!._*"])
         var env = ProcessInfo.processInfo.environment
         env["COPYFILE_DISABLE"] = "1"
-        let result = try runProcess(executable: sevenZipURL, arguments: args, currentDirectory: parent, environment: env, progressHandler: progressHandler)
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+        let result = try runProcess(
+            executable: sevenZipURL,
+            arguments: args,
+            currentDirectory: parent,
+            environment: env,
+            cancellation: cancellation,
+            progressHandler: progressHandler
+        )
+        guard result.status == 0 else { throw archiveError(for: result) }
     }
 
-    private func extractWith7z(archive: URL, outputDir: URL, progressHandler: ProgressHandler?) throws -> URL {
+    private func extractWith7z(
+        archive: URL,
+        outputDir: URL,
+        password: String?,
+        cancellation: OperationCancellation?,
+        progressHandler: ProgressHandler?
+    ) throws -> URL {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
         var args = ["x", "-y"]
         if progressHandler != nil { args.append("-bsp1") }
         args.append("-o\(outputDir.path)")
         args.append(archive.path)
-        let result = try runProcess(executable: sevenZipURL, arguments: args, progressHandler: progressHandler)
-        guard result.status == 0 else { throw ArchiveError.failed(result.stderr.isEmpty ? result.stdout : result.stderr) }
+        let result = try runProcess(
+            executable: sevenZipURL,
+            arguments: args,
+            password: password,
+            cancellation: cancellation,
+            progressHandler: progressHandler
+        )
+        guard result.status == 0 else {
+            try? fileManager.removeItem(at: outputDir)
+            throw archiveError(for: result)
+        }
         return outputDir
     }
 
-    private func runProcess(executable: URL, arguments: [String], currentDirectory: URL? = nil, environment: [String: String]? = nil, progressHandler: ProgressHandler? = nil) throws -> ProcessResult {
+    private func removePartialArchive(at output: URL) {
+        try? fileManager.removeItem(at: output)
+        let directory = output.deletingLastPathComponent()
+        let volumePrefix = output.lastPathComponent + "."
+        guard let candidates = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for candidate in candidates {
+            let name = candidate.lastPathComponent
+            guard name.hasPrefix(volumePrefix) else { continue }
+            let suffix = name.dropFirst(volumePrefix.count)
+            if suffix.count == 3, suffix.allSatisfy(\.isNumber) {
+                try? fileManager.removeItem(at: candidate)
+            }
+        }
+    }
+
+    private func runProcess(
+        executable: URL,
+        arguments: [String],
+        currentDirectory: URL? = nil,
+        environment: [String: String]? = nil,
+        password: String? = nil,
+        cancellation: OperationCancellation? = nil,
+        progressHandler: ProgressHandler? = nil
+    ) throws -> ProcessResult {
+        try cancellation?.checkCancellation()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -244,6 +449,15 @@ final class ArchiveEngine {
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        let stdinPipe: Pipe?
+        if password != nil {
+            let pipe = Pipe()
+            process.standardInput = pipe
+            stdinPipe = pipe
+        } else {
+            process.standardInput = FileHandle.nullDevice
+            stdinPipe = nil
+        }
         let stdoutBuffer = DataBuffer()
         let stderrBuffer = DataBuffer()
         let readers = DispatchGroup()
@@ -258,9 +472,26 @@ final class ArchiveEngine {
             readers.leave()
         }
         try process.run()
+        cancellation?.register(process)
+        defer { cancellation?.unregister(process) }
+        if let password, let stdinPipe {
+            stdinPipe.fileHandleForWriting.write(Data("\(password)\n".utf8))
+            try? stdinPipe.fileHandleForWriting.close()
+        }
         process.waitUntilExit()
         readers.wait()
+        try cancellation?.checkCancellation()
         return ProcessResult(status: process.terminationStatus, stdout: stdoutBuffer.string, stderr: stderrBuffer.string)
+    }
+
+    private func archiveError(for result: ProcessResult) -> ArchiveError {
+        let message = [result.stdout, result.stderr].filter { !$0.isEmpty }.joined(separator: "\n")
+        let lowercased = message.lowercased()
+        if lowercased.contains("wrong password") { return .wrongPassword }
+        if lowercased.contains("enter password") || lowercased.contains("password is required") {
+            return .passwordRequired
+        }
+        return .failed(message.isEmpty ? L10n.tr("error.unknownArchiveFailure") : message)
     }
 
     private func readPipe(_ pipe: Pipe, into buffer: DataBuffer, progressHandler: ProgressHandler?) {
@@ -364,6 +595,22 @@ final class ArchiveEngine {
     }
 }
 
+enum PendingPasswordAction: Sendable {
+    case preview(URL, generation: Int)
+    case extract(URL)
+    case test(URL)
+}
+
+enum ServiceHandoffError: Error, Sendable {
+    case passwordRequired(URL)
+}
+
+struct PasswordPrompt: Identifiable, Sendable {
+    let id = UUID()
+    let archiveName: String
+    let isRetry: Bool
+}
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -393,22 +640,34 @@ final class AppState: ObservableObject {
     @Published var format: ArchiveFormat = .zip
     @Published var splitPreset: SplitPreset = SplitPreset.all[0]
     @Published var customSplitMB = "100"
+    @Published var passwordPrompt: PasswordPrompt?
     private(set) var selectedItems: [SelectedItem] = []
     private(set) var selectedItemsRevision = 0
     private(set) var entriesRevision = 0
     private(set) var filteredEntries: [ArchiveEntry] = []
     private(set) var totalFiles = 0
     private(set) var totalBytes: Int64 = 0
+    private var previewGeneration = 0
+    private var previewCancellation: OperationCancellation?
+    private var operationCancellation: OperationCancellation?
+    private var pendingPasswordAction: PendingPasswordAction?
+    private var archivePassword: String?
 
     func handle(urls: [URL]) {
         guard !urls.isEmpty else { return }
+        previewCancellation?.cancel()
+        previewCancellation = nil
+        archivePassword = nil
+        pendingPasswordAction = nil
+        passwordPrompt = nil
+        previewGeneration &+= 1
         searchText = ""
         if urls.count == 1, ArchiveEngine.shared.isArchive(urls[0]) {
             archiveURL = urls[0]
             selectedURLs = []
             selectedItemIDs = []
             operationProgress = nil
-            previewArchive(urls[0])
+            previewArchive(urls[0], generation: previewGeneration, password: nil)
         } else {
             archiveURL = nil
             entries = []
@@ -422,6 +681,8 @@ final class AppState: ObservableObject {
 
     func appendItems(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
+        previewCancellation?.cancel()
+        previewCancellation = nil
         archiveURL = nil
         entries = []
         selectedURLs = uniqued(selectedURLs + urls)
@@ -447,25 +708,34 @@ final class AppState: ObservableObject {
         notifyStateDidChange()
     }
 
-    func previewArchive(_ url: URL) {
+    private func previewArchive(_ url: URL, generation: Int, password: String?) {
+        previewCancellation?.cancel()
+        let cancellation = OperationCancellation()
+        previewCancellation = cancellation
         isBusy = true
         status = L10n.tr("status.reading", url.lastPathComponent)
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                let list = try ArchiveEngine.shared.listArchive(url)
-                DispatchQueue.main.async {
-                    self.entries = list
-                    self.status = L10n.tr("status.previewComplete", L10n.fileCount(self.totalFiles), Self.formatBytes(self.totalBytes))
-                    self.isBusy = false
-                    self.notifyStateDidChange()
-                }
+                let list = try await ArchiveEngine.shared.listArchiveInBackground(url, password: password, cancellation: cancellation)
+                guard self.previewGeneration == generation, self.archiveURL?.standardizedFileURL == url.standardizedFileURL else { return }
+                self.previewCancellation = nil
+                self.entries = list
+                self.status = L10n.tr("status.previewComplete", L10n.fileCount(self.totalFiles), Self.formatBytes(self.totalBytes))
+                self.isBusy = false
+                self.notifyStateDidChange()
             } catch {
-                DispatchQueue.main.async {
-                    self.entries = []
-                    self.status = L10n.tr("status.previewFailed", error.localizedDescription)
-                    self.isBusy = false
-                    self.notifyStateDidChange()
+                guard self.previewGeneration == generation, self.archiveURL?.standardizedFileURL == url.standardizedFileURL else { return }
+                self.previewCancellation = nil
+                if self.isPasswordError(error) {
+                    self.requestPassword(for: .preview(url, generation: generation), archiveName: url.lastPathComponent, retry: self.isWrongPassword(error))
+                    return
                 }
+                guard !self.isCancellation(error) else { return }
+                self.entries = []
+                self.status = L10n.tr("status.previewFailed", error.localizedDescription)
+                self.isBusy = false
+                self.notifyStateDidChange()
             }
         }
         notifyStateDidChange()
@@ -473,61 +743,62 @@ final class AppState: ObservableObject {
 
     func compressSelected() {
         let urls = selectedURLs
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty, isSplitConfigurationValid else { return }
+        Self.prepareNotificationsForOperation()
         let split = resolvedSplitSpec()
         let selectedFormat = format
-        beginOperation(title: L10n.tr("operation.compressing"), detail: L10n.itemCount(urls.count))
+        let cancellation = beginOperation(title: L10n.tr("operation.compressing"), detail: L10n.itemCount(urls.count))
         showingCompressSheet = false
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                let output = try ArchiveEngine.shared.compress(urls: urls, format: selectedFormat, splitSpec: split) { fraction in
-                    DispatchQueue.main.async {
-                        self.updateOperationProgress(fraction)
-                    }
+                let output = try await ArchiveEngine.shared.compressInBackground(
+                    urls: urls,
+                    format: selectedFormat,
+                    splitSpec: split,
+                    cancellation: cancellation
+                ) { fraction in
+                    Task { @MainActor in AppState.shared.updateOperationProgress(fraction, for: cancellation) }
                 }
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.created", output.lastPathComponent)
-                    self.isBusy = false
-                    self.operationProgress = nil
-                    self.notifyStateDidChange()
-                    Self.notify(title: "CleanZip", message: L10n.tr("notification.created", output.lastPathComponent))
-                    NSWorkspace.shared.activateFileViewerSelecting([output])
-                }
+                guard self.finishOperation(status: L10n.tr("status.created", output.lastPathComponent), for: cancellation) else { return }
+                Self.notify(title: "CleanZip", message: L10n.tr("notification.created", output.lastPathComponent))
+                NSWorkspace.shared.activateFileViewerSelecting([output])
             } catch {
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.compressFailed", error.localizedDescription)
-                    self.isBusy = false
-                    self.operationProgress = nil
-                    self.notifyStateDidChange()
-                }
+                self.finishOperation(
+                    status: self.isCancellation(error) ? L10n.tr("status.cancelled") : L10n.tr("status.compressFailed", error.localizedDescription),
+                    for: cancellation
+                )
             }
         }
     }
 
     func extractCurrentArchive() {
         guard let archiveURL else { return }
-        beginOperation(title: L10n.tr("operation.extracting"), detail: archiveURL.lastPathComponent)
-        DispatchQueue.global(qos: .userInitiated).async {
+        Self.prepareNotificationsForOperation()
+        let password = archivePassword
+        let cancellation = beginOperation(title: L10n.tr("operation.extracting"), detail: archiveURL.lastPathComponent)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                let output = try ArchiveEngine.shared.extract(archive: archiveURL) { fraction in
-                    DispatchQueue.main.async {
-                        self.updateOperationProgress(fraction)
-                    }
+                let output = try await ArchiveEngine.shared.extractInBackground(
+                    archive: archiveURL,
+                    password: password,
+                    cancellation: cancellation
+                ) { fraction in
+                    Task { @MainActor in AppState.shared.updateOperationProgress(fraction, for: cancellation) }
                 }
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.extractedTo", output.lastPathComponent)
-                    self.isBusy = false
-                    self.operationProgress = nil
-                    self.notifyStateDidChange()
-                    Self.notify(title: "CleanZip", message: L10n.tr("notification.extractedTo", output.lastPathComponent))
-                    NSWorkspace.shared.activateFileViewerSelecting([output])
-                }
+                guard self.finishOperation(status: L10n.tr("status.extractedTo", output.lastPathComponent), for: cancellation) else { return }
+                Self.notify(title: "CleanZip", message: L10n.tr("notification.extractedTo", output.lastPathComponent))
+                NSWorkspace.shared.activateFileViewerSelecting([output])
             } catch {
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.extractFailed", error.localizedDescription)
-                    self.isBusy = false
-                    self.operationProgress = nil
-                    self.notifyStateDidChange()
+                if self.isPasswordError(error) {
+                    guard self.finishOperation(status: error.localizedDescription, for: cancellation) else { return }
+                    self.requestPassword(for: .extract(archiveURL), archiveName: archiveURL.lastPathComponent, retry: self.isWrongPassword(error))
+                } else {
+                    self.finishOperation(
+                        status: self.isCancellation(error) ? L10n.tr("status.cancelled") : L10n.tr("status.extractFailed", error.localizedDescription),
+                        for: cancellation
+                    )
                 }
             }
         }
@@ -535,22 +806,22 @@ final class AppState: ObservableObject {
 
     func testCurrentArchive() {
         guard let archiveURL else { return }
-        isBusy = true
-        status = L10n.tr("status.testing")
-        notifyStateDidChange()
-        DispatchQueue.global(qos: .userInitiated).async {
+        let password = archivePassword
+        let cancellation = beginOperation(title: L10n.tr("status.testing"), detail: archiveURL.lastPathComponent, fraction: nil)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                try ArchiveEngine.shared.testArchive(archiveURL)
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.testPassed")
-                    self.isBusy = false
-                    self.notifyStateDidChange()
-                }
+                try await ArchiveEngine.shared.testArchiveInBackground(archiveURL, password: password, cancellation: cancellation)
+                self.finishOperation(status: L10n.tr("status.testPassed"), for: cancellation)
             } catch {
-                DispatchQueue.main.async {
-                    self.status = L10n.tr("status.testFailed", error.localizedDescription)
-                    self.isBusy = false
-                    self.notifyStateDidChange()
+                if self.isPasswordError(error) {
+                    guard self.finishOperation(status: error.localizedDescription, for: cancellation) else { return }
+                    self.requestPassword(for: .test(archiveURL), archiveName: archiveURL.lastPathComponent, retry: self.isWrongPassword(error))
+                } else {
+                    self.finishOperation(
+                        status: self.isCancellation(error) ? L10n.tr("status.cancelled") : L10n.tr("status.testFailed", error.localizedDescription),
+                        for: cancellation
+                    )
                 }
             }
         }
@@ -561,6 +832,12 @@ final class AppState: ObservableObject {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
+        var seenTypeIdentifiers = Set<String>()
+        panel.allowedContentTypes = ArchiveEngine.supportedFilenameExtensions.compactMap { extensionName in
+            let filenameExtension = extensionName.split(separator: ".").last.map(String.init) ?? extensionName
+            guard let type = UTType(filenameExtension: filenameExtension), seenTypeIdentifiers.insert(type.identifier).inserted else { return nil }
+            return type
+        }
         if panel.runModal() == .OK, let url = panel.url { handle(urls: [url]) }
     }
 
@@ -572,10 +849,17 @@ final class AppState: ObservableObject {
         if panel.runModal() == .OK { append ? appendItems(panel.urls) : handle(urls: panel.urls) }
     }
 
+    var isSplitConfigurationValid: Bool {
+        guard splitPreset.id == "custom" else { return true }
+        let trimmed = customSplitMB.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmed) else { return false }
+        return (1...1_048_576).contains(value)
+    }
+
     func resolvedSplitSpec() -> String? {
         if splitPreset.id == "custom" {
             let trimmed = customSplitMB.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
+            guard isSplitConfigurationValid else { return nil }
             return "\(trimmed)m"
         }
         return splitPreset.spec
@@ -585,15 +869,37 @@ final class AppState: ObservableObject {
         ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
     }
 
-    static func notify(title: String, message: String, completion: (() -> Void)? = nil) {
+    static func prepareNotificationsForOperation() {
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = message
-            content.sound = .default
-            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-            center.add(request) { _ in DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { completion?() } }
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .notDetermined else { return }
+            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+    }
+
+    static func notify(title: String, message: String, completion: (@MainActor @Sendable () -> Void)? = nil) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            let deliver: @Sendable () -> Void = {
+                let content = UNMutableNotificationContent()
+                content.title = title
+                content.body = message
+                content.sound = .default
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                center.add(request) { _ in DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { completion?() } }
+            }
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                deliver()
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                    granted ? deliver() : DispatchQueue.main.async { completion?() }
+                }
+            case .denied:
+                DispatchQueue.main.async { completion?() }
+            @unknown default:
+                DispatchQueue.main.async { completion?() }
+            }
         }
     }
 
@@ -638,14 +944,20 @@ final class AppState: ObservableObject {
         beginOperation(title: title, detail: detail)
     }
 
-    func beginOperation(title: String, detail: String) {
+    @discardableResult
+    func beginOperation(title: String, detail: String, fraction: Double? = 0) -> OperationCancellation {
+        operationCancellation?.cancel()
+        let cancellation = OperationCancellation()
+        operationCancellation = cancellation
         isBusy = true
-        operationProgress = OperationProgress(title: title, detail: detail, fraction: 0)
-        status = L10n.tr("status.progress", title, "0")
+        operationProgress = OperationProgress(title: title, detail: detail, fraction: fraction)
+        status = fraction == nil ? title : L10n.tr("status.progress", title, "0")
         notifyStateDidChange()
+        return cancellation
     }
 
-    func updateOperationProgress(_ fraction: Double) {
+    func updateOperationProgress(_ fraction: Double, for operation: OperationCancellation? = nil) {
+        if let operation, operationCancellation !== operation { return }
         let clamped = min(max(fraction, 0), 1)
         let previous = operationProgress?.fraction ?? -1
         let percent = Int((clamped * 100).rounded())
@@ -660,11 +972,76 @@ final class AppState: ObservableObject {
         status = L10n.tr("status.progress", title, String(percent))
     }
 
-    func finishOperation(status: String) {
+    @discardableResult
+    func finishOperation(status: String, for operation: OperationCancellation? = nil) -> Bool {
+        if let operation, operationCancellation !== operation { return false }
         self.status = status
         isBusy = false
         operationProgress = nil
+        operationCancellation = nil
         notifyStateDidChange()
+        return true
+    }
+
+    func cancelCurrentOperation() {
+        guard let operationCancellation, isBusy else { return }
+        status = L10n.tr("status.cancelling")
+        operationCancellation.cancel()
+        notifyStateDidChange()
+    }
+
+    func submitPassword(_ password: String) {
+        let password = password.trimmingCharacters(in: .newlines)
+        guard !password.isEmpty, let action = pendingPasswordAction else { return }
+        archivePassword = password
+        pendingPasswordAction = nil
+        passwordPrompt = nil
+        switch action {
+        case .preview(let url, let generation):
+            previewArchive(url, generation: generation, password: password)
+        case .extract:
+            extractCurrentArchive()
+        case .test:
+            testCurrentArchive()
+        }
+    }
+
+    func cancelPasswordPrompt() {
+        pendingPasswordAction = nil
+        passwordPrompt = nil
+        isBusy = false
+        operationProgress = nil
+        operationCancellation = nil
+        status = L10n.tr("status.passwordCancelled")
+        notifyStateDidChange()
+    }
+
+    private func requestPassword(for action: PendingPasswordAction, archiveName: String, retry: Bool) {
+        pendingPasswordAction = action
+        passwordPrompt = PasswordPrompt(archiveName: archiveName, isRetry: retry)
+        isBusy = false
+        operationProgress = nil
+        operationCancellation = nil
+        status = L10n.tr(retry ? "error.wrongPassword" : "error.passwordRequired")
+        notifyStateDidChange()
+    }
+
+    private func isPasswordError(_ error: Error) -> Bool {
+        guard let archiveError = error as? ArchiveError else { return false }
+        switch archiveError {
+        case .passwordRequired, .wrongPassword: return true
+        default: return false
+        }
+    }
+
+    private func isWrongPassword(_ error: Error) -> Bool {
+        guard case ArchiveError.wrongPassword = error else { return false }
+        return true
+    }
+
+    private func isCancellation(_ error: Error) -> Bool {
+        guard case ArchiveError.cancelled = error else { return false }
+        return true
     }
 
     private func notifyStateDidChange() {
@@ -672,6 +1049,7 @@ final class AppState: ObservableObject {
     }
 }
 
+@MainActor
 enum FinderTableBehavior {
     static func configure(_ table: NSTableView, allowsMultipleSelection: Bool, autosaveName: String) {
         table.usesAlternatingRowBackgroundColors = true
@@ -707,6 +1085,7 @@ enum FinderTableBehavior {
     }
 }
 
+@MainActor
 struct SystemContentBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
@@ -721,24 +1100,29 @@ struct SystemContentBackground: NSViewRepresentable {
     }
 }
 
-final class ServiceProgressHUD {
+@MainActor
+final class ServiceProgressHUD: NSObject {
     private var panel: NSPanel?
     private var titleField: NSTextField?
     private var detailField: NSTextField?
     private var percentField: NSTextField?
     private var progressIndicator: NSProgressIndicator?
+    private var cancelButton: NSButton?
     private var scheduledShow: DispatchWorkItem?
+    private var cancelHandler: (() -> Void)?
     private var title = L10n.tr("operation.processing")
     private var detail = ""
     private var fraction = 0.0
     private var finished = false
 
-    func begin(title: String, detail: String) {
+    func begin(title: String, detail: String, onCancel: (() -> Void)? = nil) {
         scheduledShow?.cancel()
         self.title = title
         self.detail = detail
+        cancelHandler = onCancel
         fraction = 0
         finished = false
+        cancelButton?.isEnabled = true
         updateVisibleControls()
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -762,6 +1146,7 @@ final class ServiceProgressHUD {
 
     func finish() {
         finished = true
+        cancelHandler = nil
         scheduledShow?.cancel()
         scheduledShow = nil
         fraction = 1
@@ -862,13 +1247,23 @@ final class ServiceProgressHUD {
         percentField.textColor = .secondaryLabelColor
         percentField.alignment = .right
 
+        let cancelButton = NSButton(
+            image: NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.tr("button.cancelOperation")) ?? NSImage(),
+            target: self,
+            action: #selector(cancelOperation(_:))
+        )
+        cancelButton.bezelStyle = .circular
+        cancelButton.controlSize = .small
+        cancelButton.toolTip = L10n.tr("button.cancelOperation")
+        cancelButton.isHidden = cancelHandler == nil
+
         let textStack = NSStackView(views: [titleField, detailField])
         textStack.orientation = .vertical
         textStack.spacing = 2
         textStack.alignment = .leading
         textStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let bottomStack = NSStackView(views: [progressIndicator, percentField])
+        let bottomStack = NSStackView(views: [progressIndicator, percentField, cancelButton])
         bottomStack.orientation = .horizontal
         bottomStack.spacing = 10
         bottomStack.alignment = .centerY
@@ -886,7 +1281,7 @@ final class ServiceProgressHUD {
             bottomStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             bottomStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             bottomStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -18),
-            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 190),
             percentField.widthAnchor.constraint(equalToConstant: 42)
         ])
 
@@ -894,6 +1289,7 @@ final class ServiceProgressHUD {
         self.detailField = detailField
         self.percentField = percentField
         self.progressIndicator = progressIndicator
+        self.cancelButton = cancelButton
         position(panel)
         return panel
     }
@@ -926,13 +1322,13 @@ final class ServiceProgressHUD {
         }
     }
 
-    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (() -> Void)? = nil) {
+    private func animate(_ panel: NSPanel, alpha: CGFloat, duration: TimeInterval, completion: (@MainActor @Sendable () -> Void)? = nil) {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
             context.timingFunction = CAMediaTimingFunction(name: alpha > panel.alphaValue ? .easeOut : .easeIn)
             panel.animator().alphaValue = alpha
         } completionHandler: {
-            completion?()
+            Task { @MainActor in completion?() }
         }
     }
 
@@ -945,14 +1341,24 @@ final class ServiceProgressHUD {
         detailField?.stringValue = detail
         progressIndicator?.doubleValue = fraction
         percentField?.stringValue = percentText
+        cancelButton?.isHidden = cancelHandler == nil
+    }
+
+    @objc private func cancelOperation(_ sender: NSButton) {
+        sender.isEnabled = false
+        title = L10n.tr("status.cancelling")
+        updateVisibleControls()
+        cancelHandler?()
     }
 }
 
+@MainActor
 struct ArchiveEntriesTable: NSViewRepresentable {
     let entries: [ArchiveEntry]
     let contentRevision: Int
     let filter: String
 
+    @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var entries: [ArchiveEntry]
         var contentRevision: Int
@@ -1022,7 +1428,10 @@ struct ArchiveEntriesTable: NSViewRepresentable {
                 ])
             }
 
-            imageView.image = NSImage(systemSymbolName: entry.isDirectory ? "folder" : "doc", accessibilityDescription: nil)
+            imageView.image = NSImage(
+                systemSymbolName: entry.isDirectory ? "folder" : "doc",
+                accessibilityDescription: L10n.tr(entry.isDirectory ? "item.type.folder" : "item.type.file")
+            )
             imageView.contentTintColor = .secondaryLabelColor
             textField.stringValue = entry.path
             textField.alignment = .left
@@ -1114,11 +1523,13 @@ struct ArchiveEntriesTable: NSViewRepresentable {
     }
 }
 
+@MainActor
 struct SelectedItemsTable: NSViewRepresentable {
     let items: [SelectedItem]
     let contentRevision: Int
     @Binding var selectedIDs: Set<String>
 
+    @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
         var items: [SelectedItem]
         var contentRevision: Int
@@ -1225,7 +1636,10 @@ struct SelectedItemsTable: NSViewRepresentable {
                 ])
             }
 
-            imageView.image = NSImage(systemSymbolName: item.isDirectory ? "folder" : "doc", accessibilityDescription: nil)
+            imageView.image = NSImage(
+                systemSymbolName: item.isDirectory ? "folder" : "doc",
+                accessibilityDescription: L10n.tr(item.isDirectory ? "item.type.folder" : "item.type.file")
+            )
             imageView.contentTintColor = .secondaryLabelColor
             textField.stringValue = item.name
             textField.alignment = .left
@@ -1344,8 +1758,17 @@ struct ContentView: View {
         .background(SystemContentBackground().ignoresSafeArea())
         .animation(contentAnimation, value: contentIdentity)
         .animation(dropAnimation, value: dropIsTargeted)
-        .onDrop(of: [.fileURL], isTargeted: $dropIsTargeted, perform: handleDrop)
+        .dropDestination(for: URL.self) { urls, _ in
+            guard !urls.isEmpty else { return false }
+            state.handle(urls: urls)
+            return true
+        } isTargeted: { isTargeted in
+            dropIsTargeted = isTargeted
+        }
         .sheet(isPresented: $state.showingCompressSheet) { CompressSheet().environmentObject(state) }
+        .sheet(item: $state.passwordPrompt) { prompt in
+            PasswordSheet(prompt: prompt).environmentObject(state)
+        }
     }
 
     private var contentIdentity: String {
@@ -1441,16 +1864,28 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             if let progress = state.operationProgress {
-                ProgressView(value: progress.fraction ?? 0, total: 1)
-                    .progressViewStyle(.linear)
-                    .frame(width: 180)
-                    .accessibilityLabel(progress.title)
-                    .accessibilityValue(progress.percentText)
-                Text(progress.percentText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .frame(width: 42, alignment: .trailing)
-                    .contentTransition(.numericText())
+                if let fraction = progress.fraction {
+                    ProgressView(value: fraction, total: 1)
+                        .progressViewStyle(.linear)
+                        .frame(width: 180)
+                        .accessibilityLabel(progress.title)
+                        .accessibilityValue(progress.percentText)
+                    Text(progress.percentText)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 42, alignment: .trailing)
+                        .contentTransition(.numericText())
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel(progress.title)
+                }
+                Button { state.cancelCurrentOperation() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.tr("button.cancelOperation"))
+                .accessibilityLabel(L10n.tr("button.cancelOperation"))
             }
         }
         .padding(.horizontal, 12)
@@ -1458,22 +1893,44 @@ struct ContentView: View {
         .background(.bar)
     }
 
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        let lock = NSLock()
-        var urls = [URL?](repeating: nil, count: providers.count)
-        let group = DispatchGroup()
-        for (index, provider) in providers.enumerated() {
-            group.enter()
-            provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
-                defer { group.leave() }
-                guard let data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                lock.lock()
-                urls[index] = url
-                lock.unlock()
+}
+
+struct PasswordSheet: View {
+    @EnvironmentObject private var state: AppState
+    let prompt: PasswordPrompt
+    @State private var password = ""
+    @FocusState private var passwordFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(L10n.tr("password.title"))
+                .font(.title2.weight(.semibold))
+            Text(L10n.tr(prompt.isRetry ? "password.incorrect" : "password.message", prompt.archiveName))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SecureField(L10n.tr("password.placeholder"), text: $password)
+                .textFieldStyle(.roundedBorder)
+                .focused($passwordFocused)
+                .onSubmit(submit)
+            HStack {
+                Spacer()
+                Button(L10n.tr("button.cancel")) { state.cancelPasswordPrompt() }
+                    .keyboardShortcut(.cancelAction)
+                Button(L10n.tr("password.unlock"), action: submit)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(password.isEmpty)
             }
         }
-        group.notify(queue: .main) { state.handle(urls: urls.compactMap { $0 }) }
-        return true
+        .padding(22)
+        .frame(width: 420)
+        .interactiveDismissDisabled()
+        .onAppear { passwordFocused = true }
+    }
+
+    private func submit() {
+        guard !password.isEmpty else { return }
+        state.submitPassword(password)
     }
 }
 
@@ -1494,9 +1951,18 @@ struct CompressSheet: View {
                     ForEach(SplitPreset.all) { preset in Text(preset.title).tag(preset) }
                 }
                 if state.splitPreset.id == "custom" {
-                    HStack {
-                        TextField(L10n.tr("settings.sizePlaceholder"), text: $state.customSplitMB).textFieldStyle(.roundedBorder).frame(width: 90)
-                        Text("MB").foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            TextField(L10n.tr("settings.sizePlaceholder"), text: $state.customSplitMB)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 90)
+                            Text("MB").foregroundStyle(.secondary)
+                        }
+                        if !state.isSplitConfigurationValid {
+                            Text(L10n.tr("settings.invalidSplitSize"))
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
                 }
@@ -1507,7 +1973,9 @@ struct CompressSheet: View {
             HStack {
                 Spacer()
                 Button(L10n.tr("button.cancel")) { dismiss() }
-                Button { state.compressSelected() } label: { Label(L10n.tr("button.startCompress"), systemImage: "archivebox") }.buttonStyle(.borderedProminent)
+                Button { state.compressSelected() } label: { Label(L10n.tr("button.startCompress"), systemImage: "archivebox") }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!state.isSplitConfigurationValid || state.isBusy)
             }
         }
         .padding(22)
@@ -1516,7 +1984,7 @@ struct CompressSheet: View {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDelegate, UNUserNotificationCenterDelegate, NSSearchFieldDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSToolbarDelegate, UNUserNotificationCenterDelegate, NSSearchFieldDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private var serviceInvoked = false
     private var openedFromFile = false
@@ -1524,6 +1992,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     private var stateObserver: AnyCancellable?
     private var searchExpanded = false
     private let serviceProgressHUD = ServiceProgressHUD()
+    private var serviceCancellation: OperationCancellation?
     private let chooseArchiveItemID = NSToolbarItem.Identifier("local.codex.cleanzip.chooseArchive")
     private let chooseItemsItemID = NSToolbarItem.Identifier("local.codex.cleanzip.chooseItems")
     private let addItemsItemID = NSToolbarItem.Identifier("local.codex.cleanzip.addItems")
@@ -1534,6 +2003,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     private let extractArchiveItemID = NSToolbarItem.Identifier("local.codex.cleanzip.extractArchive")
     private let compactSearchItemID = NSToolbarItem.Identifier("local.codex.cleanzip.compactSearch")
     private let searchItemID = NSToolbarItem.Identifier("local.codex.cleanzip.search")
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        configureMainMenu()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = self
@@ -1549,7 +2022,158 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         }
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound] }
+    func configureMainMenu() {
+        let appName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ?? "CleanZip"
+        let mainMenu = NSMenu(title: appName)
+
+        let appMenu = NSMenu(title: appName)
+        appMenu.addItem(menuItem(
+            title: L10n.tr("menu.about", appName),
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            target: NSApp
+        ))
+        appMenu.addItem(.separator())
+        let servicesMenu = NSMenu(title: L10n.tr("menu.services"))
+        let servicesItem = menuItem(title: L10n.tr("menu.services"), action: nil)
+        servicesItem.submenu = servicesMenu
+        appMenu.addItem(servicesItem)
+        NSApp.servicesMenu = servicesMenu
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem(
+            title: L10n.tr("menu.hide", appName),
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h",
+            target: NSApp
+        ))
+        appMenu.addItem(menuItem(
+            title: L10n.tr("menu.hideOthers"),
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            keyEquivalent: "h",
+            modifiers: [.command, .option],
+            target: NSApp
+        ))
+        appMenu.addItem(menuItem(
+            title: L10n.tr("menu.showAll"),
+            action: #selector(NSApplication.unhideAllApplications(_:)),
+            target: NSApp
+        ))
+        appMenu.addItem(.separator())
+        appMenu.addItem(menuItem(
+            title: L10n.tr("menu.quit", appName),
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q",
+            target: NSApp
+        ))
+        mainMenu.addItem(topLevelItem(title: appName, submenu: appMenu))
+
+        let fileMenu = NSMenu(title: L10n.tr("menu.file"))
+        fileMenu.addItem(menuItem(
+            title: L10n.tr("toolbar.chooseArchive") + "\u{2026}",
+            action: #selector(openArchiveFromToolbar(_:)),
+            keyEquivalent: "o",
+            target: self
+        ))
+        fileMenu.addItem(menuItem(
+            title: L10n.tr("toolbar.chooseItems") + "\u{2026}",
+            action: #selector(openItemsFromToolbar(_:)),
+            keyEquivalent: "o",
+            modifiers: [.command, .shift],
+            target: self
+        ))
+        fileMenu.addItem(menuItem(
+            title: L10n.tr("toolbar.add") + "\u{2026}",
+            action: #selector(addItemsFromToolbar(_:)),
+            keyEquivalent: "o",
+            modifiers: [.command, .option],
+            target: self
+        ))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(menuItem(title: L10n.tr("toolbar.test"), action: #selector(testArchiveFromToolbar(_:)), target: self))
+        fileMenu.addItem(menuItem(title: L10n.tr("toolbar.extract"), action: #selector(extractArchiveFromToolbar(_:)), target: self))
+        fileMenu.addItem(menuItem(title: L10n.tr("toolbar.compressSettings") + "\u{2026}", action: #selector(compressSettingsFromToolbar(_:)), target: self))
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(menuItem(
+            title: L10n.tr("menu.close"),
+            action: #selector(NSWindow.performClose(_:)),
+            keyEquivalent: "w"
+        ))
+        mainMenu.addItem(topLevelItem(title: L10n.tr("menu.file"), submenu: fileMenu))
+
+        let editMenu = NSMenu(title: L10n.tr("menu.edit"))
+        editMenu.addItem(menuItem(title: L10n.tr("menu.undo"), action: Selector(("undo:")), keyEquivalent: "z"))
+        editMenu.addItem(menuItem(title: L10n.tr("menu.redo"), action: Selector(("redo:")), keyEquivalent: "z", modifiers: [.command, .shift]))
+        editMenu.addItem(.separator())
+        editMenu.addItem(menuItem(title: L10n.tr("menu.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(menuItem(title: L10n.tr("menu.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(menuItem(title: L10n.tr("menu.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(.separator())
+        editMenu.addItem(menuItem(
+            title: L10n.tr("toolbar.remove"),
+            action: #selector(removeItemsFromToolbar(_:)),
+            keyEquivalent: "\u{8}",
+            modifiers: [],
+            target: self
+        ))
+        editMenu.addItem(menuItem(title: L10n.tr("toolbar.clear"), action: #selector(clearItemsFromToolbar(_:)), target: self))
+        editMenu.addItem(.separator())
+        editMenu.addItem(menuItem(title: L10n.tr("menu.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        mainMenu.addItem(topLevelItem(title: L10n.tr("menu.edit"), submenu: editMenu))
+
+        let viewMenu = NSMenu(title: L10n.tr("menu.view"))
+        viewMenu.addItem(menuItem(
+            title: L10n.tr("toolbar.search"),
+            action: #selector(beginSearchFromToolbar(_:)),
+            keyEquivalent: "f",
+            target: self
+        ))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(menuItem(
+            title: L10n.tr("menu.enterFullScreen"),
+            action: #selector(NSWindow.toggleFullScreen(_:)),
+            keyEquivalent: "f",
+            modifiers: [.command, .control]
+        ))
+        mainMenu.addItem(topLevelItem(title: L10n.tr("menu.view"), submenu: viewMenu))
+
+        let windowMenu = NSMenu(title: L10n.tr("menu.window"))
+        windowMenu.addItem(menuItem(
+            title: L10n.tr("menu.minimize"),
+            action: #selector(NSWindow.performMiniaturize(_:)),
+            keyEquivalent: "m"
+        ))
+        windowMenu.addItem(menuItem(title: L10n.tr("menu.zoom"), action: #selector(NSWindow.performZoom(_:))))
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(menuItem(title: L10n.tr("menu.bringAllToFront"), action: #selector(NSApplication.arrangeInFront(_:))))
+        mainMenu.addItem(topLevelItem(title: L10n.tr("menu.window"), submenu: windowMenu))
+        NSApp.windowsMenu = windowMenu
+
+        let helpMenu = NSMenu(title: L10n.tr("menu.help"))
+        helpMenu.addItem(menuItem(title: L10n.tr("menu.helpItem", appName), action: #selector(showHelp(_:)), target: self))
+        mainMenu.addItem(topLevelItem(title: L10n.tr("menu.help"), submenu: helpMenu))
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    private func topLevelItem(title: String, submenu: NSMenu) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    private func menuItem(
+        title: String,
+        action: Selector?,
+        keyEquivalent: String = "",
+        modifiers: NSEvent.ModifierFlags = [.command],
+        target: AnyObject? = nil
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.target = target
+        if !keyEquivalent.isEmpty { item.keyEquivalentModifierMask = modifiers }
+        return item
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound] }
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
         openedFromUntitledLaunch = true
         NSApp.setActivationPolicy(.regular)
@@ -1579,7 +2203,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         let operationDetail = shouldExtract
             ? (urls.count == 1 ? urls[0].lastPathComponent : L10n.archiveCount(urls.count))
             : (urls.count == 1 ? urls[0].lastPathComponent : L10n.itemCount(urls.count))
-        serviceProgressHUD.begin(title: operationTitle, detail: operationDetail)
+        AppState.prepareNotificationsForOperation()
+        let cancellation = OperationCancellation()
+        serviceCancellation = cancellation
+        serviceProgressHUD.begin(title: operationTitle, detail: operationDetail) { cancellation.cancel() }
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 if shouldExtract {
@@ -1587,31 +2214,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
                     for (index, url) in urls.enumerated() {
                         let base = Double(index) / Double(urls.count)
                         let scale = 1 / Double(urls.count)
-                        outputs.append(try ArchiveEngine.shared.extract(archive: url) { fraction in
-                            DispatchQueue.main.async {
-                                self.serviceProgressHUD.update(fraction: base + fraction * scale, detail: url.lastPathComponent)
+                        do {
+                            outputs.append(try ArchiveEngine.shared.extract(archive: url, cancellation: cancellation) { fraction in
+                                DispatchQueue.main.async {
+                                    self.serviceProgressHUD.update(fraction: base + fraction * scale, detail: url.lastPathComponent)
+                                }
+                            })
+                        } catch let archiveError as ArchiveError {
+                            switch archiveError {
+                            case .passwordRequired, .wrongPassword:
+                                throw ServiceHandoffError.passwordRequired(url)
+                            default:
+                                throw archiveError
                             }
-                        })
+                        }
                     }
                     DispatchQueue.main.async {
+                        self.serviceCancellation = nil
                         self.serviceProgressHUD.finish()
                         let message = outputs.count == 1 ? L10n.tr("notification.extractedTo", outputs[0].lastPathComponent) : L10n.tr("notification.extractedArchives", L10n.archiveCount(outputs.count))
                         AppState.notify(title: "CleanZip", message: message) { self.terminateIfServiceOnly() }
                     }
                 } else {
-                    let output = try ArchiveEngine.shared.compress(urls: urls, format: .zip, splitSpec: nil) { fraction in
+                    let output = try ArchiveEngine.shared.compress(urls: urls, format: .zip, splitSpec: nil, cancellation: cancellation) { fraction in
                         DispatchQueue.main.async {
                             self.serviceProgressHUD.update(fraction: fraction)
                         }
                     }
                     DispatchQueue.main.async {
+                        self.serviceCancellation = nil
                         self.serviceProgressHUD.finish()
                         let message = L10n.tr("notification.created", output.lastPathComponent)
                         AppState.notify(title: "CleanZip", message: message) { self.terminateIfServiceOnly() }
                     }
                 }
+            } catch ServiceHandoffError.passwordRequired(let url) {
+                DispatchQueue.main.async {
+                    self.serviceCancellation = nil
+                    self.serviceProgressHUD.finish()
+                    self.showWindow()
+                    AppState.shared.handle(urls: [url])
+                }
+            } catch ArchiveError.cancelled {
+                DispatchQueue.main.async {
+                    self.serviceCancellation = nil
+                    self.serviceProgressHUD.finish()
+                    AppState.notify(title: "CleanZip", message: L10n.tr("status.cancelled")) { self.terminateIfServiceOnly() }
+                }
             } catch {
                 DispatchQueue.main.async {
+                    self.serviceCancellation = nil
                     self.serviceProgressHUD.finish()
                     AppState.notify(title: L10n.tr("notification.operationFailedTitle"), message: error.localizedDescription) {
                         self.terminateIfServiceOnly()
@@ -1836,6 +2488,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     @objc private func testArchiveFromToolbar(_ sender: Any?) { AppState.shared.testCurrentArchive(); refreshToolbar() }
     @objc private func extractArchiveFromToolbar(_ sender: Any?) { AppState.shared.extractCurrentArchive(); refreshToolbar() }
     @objc private func searchFromToolbar(_ sender: NSSearchField) { AppState.shared.searchText = sender.stringValue; refreshToolbar() }
+    @objc private func showHelp(_ sender: Any?) {
+        guard let url = URL(string: "https://lyc280705.github.io/CleanZip/") else { return }
+        NSWorkspace.shared.open(url)
+    }
     @objc private func beginSearchFromToolbar(_ sender: Any?) {
         searchExpanded = true
         refreshToolbar()
@@ -1864,6 +2520,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
             return AppState.shared.archiveURL != nil && !AppState.shared.isBusy
         case compactSearchItemID, searchItemID:
             return AppState.shared.archiveURL != nil && !AppState.shared.isBusy
+        default:
+            return true
+        }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard let action = menuItem.action else { return true }
+        let state = AppState.shared
+        switch action {
+        case #selector(openArchiveFromToolbar(_:)), #selector(openItemsFromToolbar(_:)):
+            return !state.isBusy
+        case #selector(addItemsFromToolbar(_:)), #selector(clearItemsFromToolbar(_:)), #selector(compressSettingsFromToolbar(_:)):
+            return !state.selectedURLs.isEmpty && !state.isBusy
+        case #selector(removeItemsFromToolbar(_:)):
+            return !state.selectedItemIDs.isEmpty && !state.isBusy
+        case #selector(testArchiveFromToolbar(_:)), #selector(extractArchiveFromToolbar(_:)), #selector(beginSearchFromToolbar(_:)):
+            return state.archiveURL != nil && !state.isBusy
         default:
             return true
         }
@@ -1933,7 +2606,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     private func configureNotifications() {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
     private func pasteboardURLs(_ pasteboard: NSPasteboard) -> [URL] {
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty { return urls }

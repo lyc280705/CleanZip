@@ -58,8 +58,8 @@ if [[ -x "$SERVICE/Contents/Resources/7zz" ]]; then
   chmod +x "$SERVICE/Contents/Resources/7zz"
 fi
 
-codesign --force --deep --sign - "$APP"
-codesign --force --deep --sign - "$SERVICE"
+codesign --force --deep --options runtime --timestamp=none --sign - "$APP"
+codesign --force --deep --options runtime --timestamp=none --sign - "$SERVICE"
 
 echo "Built $APP"
 echo "Built $SERVICE"
