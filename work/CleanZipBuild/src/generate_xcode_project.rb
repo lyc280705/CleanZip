@@ -20,6 +20,7 @@ icon_group = main_group.new_group("Icon", nil)
 
 main_ref = src_group.new_file("main.swift")
 service_ref = src_group.new_file("service.swift")
+safety_ref = src_group.new_file("ArchiveFileSafety.swift")
 app_info_ref = src_group.new_file("CleanZip-Info.plist")
 service_info_ref = src_group.new_file("CleanZipService-Info.plist")
 resources_group.new_file("7zz")
@@ -99,6 +100,7 @@ end
 
 app_target = project.new_target(:application, "CleanZip", :osx, "14.0")
 app_target.source_build_phase.add_file_reference(main_ref)
+app_target.source_build_phase.add_file_reference(safety_ref)
 app_target.resources_build_phase.add_file_reference(asset_catalog_ref)
 app_target.resources_build_phase.add_file_reference(icon_ref)
 configure_target(
@@ -112,6 +114,7 @@ configure_target(
 
 service_target = project.new_target(:application, "CleanZipService", :osx, "14.0")
 service_target.source_build_phase.add_file_reference(service_ref)
+service_target.source_build_phase.add_file_reference(safety_ref)
 service_target.resources_build_phase.add_file_reference(asset_catalog_ref)
 service_target.resources_build_phase.add_file_reference(icon_ref)
 configure_target(
@@ -135,6 +138,11 @@ end
   scheme.add_build_target(target)
   scheme.set_launch_target(target)
   scheme.save_as(project_path, target.name, true)
+end
+
+project.files.select { |file| file.name == "Cocoa.framework" }.each do |file|
+  file.path = "System/Library/Frameworks/Cocoa.framework"
+  file.source_tree = "SDKROOT"
 end
 
 project.save

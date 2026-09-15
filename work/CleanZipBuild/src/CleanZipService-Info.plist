@@ -37,7 +37,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>2.6</string>
 	<key>CFBundleVersion</key>
-	<string>35</string>
+	<string>36</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
@@ -65,11 +65,6 @@
 			<key>NSSendFileTypes</key>
 			<array>
 				<string>public.item</string>
-			</array>
-			<key>NSSendTypes</key>
-			<array>
-				<string>NSFilenamesPboardType</string>
-				<string>NSURLPboardType</string>
 			</array>
 		</dict>
 	</array>

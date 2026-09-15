@@ -200,6 +200,7 @@ final class ArchiveEngine: @unchecked Sendable {
     }
 
     func isArchive(_ url: URL) -> Bool {
+        guard ArchiveFileSafety.isRegularArchiveCandidate(url) else { return false }
         let name = url.lastPathComponent.lowercased()
         if Self.supportedFilenameExtensions.contains(where: { name.hasSuffix(".\($0)") }) { return true }
         if name.range(of: #"\.z\d{2}$"#, options: .regularExpression) != nil { return true }
@@ -211,7 +212,7 @@ final class ArchiveEngine: @unchecked Sendable {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
         let result = try runProcess(
             executable: sevenZipURL,
-            arguments: ["l", "-slt", archive.path],
+            arguments: ["l", "-slt", "-spd", "--", archive.path],
             password: password,
             cancellation: cancellation
         )
@@ -228,7 +229,7 @@ final class ArchiveEngine: @unchecked Sendable {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
         let result = try runProcess(
             executable: sevenZipURL,
-            arguments: ["t", "-y", archive.path],
+            arguments: ["t", "-y", "-spd", "--", archive.path],
             password: password,
             cancellation: cancellation
         )
@@ -253,22 +254,21 @@ final class ArchiveEngine: @unchecked Sendable {
             throw ArchiveError.failed(L10n.tr("error.sameParentRequired"))
         }
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
-        let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: format.fileExtension, splitSpec: splitSpec)
+        try cancellation?.checkCancellation()
+        let workspace = try ArchiveWorkspace(in: parent)
+        let output = workspace.directory.appendingPathComponent(baseName + "." + format.fileExtension)
         let itemNames = urls.map { itemNameForProcess($0) }
-        do {
-            try compressWith7z(
-                parent: parent,
-                output: output,
-                itemNames: itemNames,
-                archiveType: format == .zip ? "zip" : "7z",
-                splitSpec: splitSpec,
-                cancellation: cancellation,
-                progressHandler: progressHandler
-            )
-            return output
-        } catch {
-            removePartialArchive(at: output)
-            throw error
+        try compressWith7z(
+            parent: parent,
+            output: output,
+            itemNames: itemNames,
+            archiveType: format == .zip ? "zip" : "7z",
+            splitSpec: splitSpec,
+            cancellation: cancellation,
+            progressHandler: progressHandler
+        )
+        return try workspace.publishArchive(output, baseName: baseName, extensionName: format.fileExtension, split: splitSpec?.isEmpty == false) {
+            try cancellation?.checkCancellation()
         }
     }
 
@@ -297,51 +297,27 @@ final class ArchiveEngine: @unchecked Sendable {
     ) throws -> URL {
         let parent = archive.deletingLastPathComponent()
         let baseName = archiveBaseName(archive)
-        let outputDir = uniqueDirectoryURL(in: parent, baseName: baseName)
-        try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
-        do {
-            if progressHandler != nil || password != nil {
-                return try extractWith7z(
-                    archive: archive,
-                    outputDir: outputDir,
-                    password: password,
-                    cancellation: cancellation,
-                    progressHandler: progressHandler
-                )
+        try cancellation?.checkCancellation()
+        let workspace = try ArchiveWorkspace(in: parent)
+        let outputDir = try workspace.makeDirectory("content")
+        if ArchiveFileSafety.isCompressedTar(archive) {
+            let outerDir = try workspace.makeDirectory("outer")
+            _ = try extractWith7z(archive: archive, outputDir: outerDir, password: password, cancellation: cancellation, progressHandler: nil)
+            let contents = try fileManager.contentsOfDirectory(at: outerDir, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard contents.count == 1,
+                  try contents[0].resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile == true,
+                  try contents[0].resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                throw ArchiveError.failed(L10n.tr("error.unknownArchiveFailure"))
             }
-            if archive.lastPathComponent.lowercased().hasSuffix(".zip") {
-                let result = try runProcess(
-                    executable: URL(fileURLWithPath: "/usr/bin/ditto"),
-                    arguments: ["-x", "-k", archive.path, outputDir.path],
-                    cancellation: cancellation
-                )
-                if result.status == 0 { return outputDir }
-                try? fileManager.removeItem(at: outputDir)
-                let fallbackDir = uniqueDirectoryURL(in: parent, baseName: baseName)
-                try fileManager.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
-                do {
-                    return try extractWith7z(
-                        archive: archive,
-                        outputDir: fallbackDir,
-                        password: password,
-                        cancellation: cancellation,
-                        progressHandler: progressHandler
-                    )
-                } catch {
-                    try? fileManager.removeItem(at: fallbackDir)
-                    throw error
-                }
-            }
-            return try extractWith7z(
-                archive: archive,
-                outputDir: outputDir,
-                password: password,
-                cancellation: cancellation,
-                progressHandler: progressHandler
-            )
-        } catch {
-            try? fileManager.removeItem(at: outputDir)
-            throw error
+            _ = try extractWith7z(archive: contents[0], outputDir: outputDir, password: nil, cancellation: cancellation, progressHandler: progressHandler, archiveType: "tar")
+        } else {
+            _ = try extractWith7z(archive: archive, outputDir: outputDir, password: password, cancellation: cancellation, progressHandler: progressHandler)
+        }
+        try ArchiveFileSafety.propagateQuarantine(from: archive, to: outputDir) {
+            try cancellation?.checkCancellation()
+        }
+        return try workspace.publishDirectory(outputDir, baseName: baseName) {
+            try cancellation?.checkCancellation()
         }
     }
 
@@ -370,12 +346,11 @@ final class ArchiveEngine: @unchecked Sendable {
         progressHandler: ProgressHandler?
     ) throws {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        var args = ["a", "-t\(archiveType)", "-mx=5", "-y"]
+        var args = ["a", "-t\(archiveType)", "-mx=5", "-y", "-spd", "-xr!.DS_Store", "-xr!__MACOSX", "-xrw!._*"]
         if progressHandler != nil { args.append("-bsp1") }
         if let splitSpec, !splitSpec.isEmpty { args.append("-v\(splitSpec)") }
-        args.append(output.path)
+        args.append(contentsOf: ["--", output.path])
         args.append(contentsOf: itemNames)
-        args.append(contentsOf: ["-xr!.DS_Store", "-xr!__MACOSX", "-xr!._*"])
         var env = ProcessInfo.processInfo.environment
         env["COPYFILE_DISABLE"] = "1"
         let result = try runProcess(
@@ -394,13 +369,15 @@ final class ArchiveEngine: @unchecked Sendable {
         outputDir: URL,
         password: String?,
         cancellation: OperationCancellation?,
-        progressHandler: ProgressHandler?
+        progressHandler: ProgressHandler?,
+        archiveType: String? = nil
     ) throws -> URL {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        var args = ["x", "-y"]
+        var args = ["x", "-y", "-spd"]
+        if let archiveType { args.append("-t\(archiveType)") }
         if progressHandler != nil { args.append("-bsp1") }
         args.append("-o\(outputDir.path)")
-        args.append(archive.path)
+        args.append(contentsOf: ["--", archive.path])
         let result = try runProcess(
             executable: sevenZipURL,
             arguments: args,
@@ -409,25 +386,9 @@ final class ArchiveEngine: @unchecked Sendable {
             progressHandler: progressHandler
         )
         guard result.status == 0 else {
-            try? fileManager.removeItem(at: outputDir)
             throw archiveError(for: result)
         }
         return outputDir
-    }
-
-    private func removePartialArchive(at output: URL) {
-        try? fileManager.removeItem(at: output)
-        let directory = output.deletingLastPathComponent()
-        let volumePrefix = output.lastPathComponent + "."
-        guard let candidates = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
-        for candidate in candidates {
-            let name = candidate.lastPathComponent
-            guard name.hasPrefix(volumePrefix) else { continue }
-            let suffix = name.dropFirst(volumePrefix.count)
-            if suffix.count == 3, suffix.allSatisfy(\.isNumber) {
-                try? fileManager.removeItem(at: candidate)
-            }
-        }
     }
 
     private func runProcess(
@@ -460,6 +421,9 @@ final class ArchiveEngine: @unchecked Sendable {
         }
         let stdoutBuffer = DataBuffer()
         let stderrBuffer = DataBuffer()
+        try process.run()
+        cancellation?.register(process)
+        defer { cancellation?.unregister(process) }
         let readers = DispatchGroup()
         readers.enter()
         DispatchQueue.global(qos: .utility).async {
@@ -471,9 +435,6 @@ final class ArchiveEngine: @unchecked Sendable {
             self.readPipe(stderrPipe, into: stderrBuffer, progressHandler: progressHandler)
             readers.leave()
         }
-        try process.run()
-        cancellation?.register(process)
-        defer { cancellation?.unregister(process) }
         if let password, let stdinPipe {
             stdinPipe.fileHandleForWriting.write(Data("\(password)\n".utf8))
             try? stdinPipe.fileHandleForWriting.close()
@@ -554,8 +515,7 @@ final class ArchiveEngine: @unchecked Sendable {
     }
 
     private func itemNameForProcess(_ url: URL) -> String {
-        let name = url.lastPathComponent
-        return name.hasPrefix("-") ? "./\(name)" : name
+        "./" + url.lastPathComponent
     }
 
     private func archiveBaseName(_ url: URL) -> String {
@@ -568,31 +528,6 @@ final class ArchiveEngine: @unchecked Sendable {
         return url.deletingPathExtension().lastPathComponent
     }
 
-    private func uniqueFileURL(in directory: URL, baseName: String, extensionName: String, splitSpec: String?) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(extensionName)")
-        var index = 2
-        while outputExists(candidate, splitSpec: splitSpec, extensionName: extensionName) {
-            candidate = directory.appendingPathComponent("\(baseName) \(index).\(extensionName)")
-            index += 1
-        }
-        return candidate
-    }
-
-    private func outputExists(_ url: URL, splitSpec: String?, extensionName: String) -> Bool {
-        if fileManager.fileExists(atPath: url.path) { return true }
-        if splitSpec != nil, extensionName == "zip" || extensionName == "7z" { return fileManager.fileExists(atPath: "\(url.path).001") }
-        return false
-    }
-
-    private func uniqueDirectoryURL(in directory: URL, baseName: String) -> URL {
-        var candidate = directory.appendingPathComponent(baseName)
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName) \(index)")
-            index += 1
-        }
-        return candidate
-    }
 }
 
 enum PendingPasswordAction: Sendable {
@@ -655,34 +590,40 @@ final class AppState: ObservableObject {
 
     func handle(urls: [URL]) {
         guard !urls.isEmpty else { return }
-        previewCancellation?.cancel()
-        previewCancellation = nil
-        archivePassword = nil
-        pendingPasswordAction = nil
-        passwordPrompt = nil
-        previewGeneration &+= 1
-        searchText = ""
+        resetWorkForNewInput()
         if urls.count == 1, ArchiveEngine.shared.isArchive(urls[0]) {
             archiveURL = urls[0]
             selectedURLs = []
             selectedItemIDs = []
-            operationProgress = nil
             previewArchive(urls[0], generation: previewGeneration, password: nil)
         } else {
             archiveURL = nil
-            entries = []
             selectedURLs = uniqued(urls)
             selectedItemIDs = []
-            operationProgress = nil
             status = L10n.tr("status.selectedItems", L10n.itemCount(selectedURLs.count))
         }
         notifyStateDidChange()
     }
 
-    func appendItems(_ urls: [URL]) {
-        guard !urls.isEmpty else { return }
+    private func resetWorkForNewInput() {
         previewCancellation?.cancel()
         previewCancellation = nil
+        operationCancellation?.cancel()
+        operationCancellation = nil
+        isBusy = false
+        operationProgress = nil
+        entries = []
+        showingCompressSheet = false
+        archivePassword = nil
+        pendingPasswordAction = nil
+        passwordPrompt = nil
+        previewGeneration &+= 1
+        searchText = ""
+    }
+
+    func appendItems(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        resetWorkForNewInput()
         archiveURL = nil
         entries = []
         selectedURLs = uniqued(selectedURLs + urls)
@@ -743,7 +684,7 @@ final class AppState: ObservableObject {
 
     func compressSelected() {
         let urls = selectedURLs
-        guard !urls.isEmpty, isSplitConfigurationValid else { return }
+        guard !urls.isEmpty, isSplitConfigurationValid, !isBusy else { return }
         Self.prepareNotificationsForOperation()
         let split = resolvedSplitSpec()
         let selectedFormat = format
@@ -773,7 +714,7 @@ final class AppState: ObservableObject {
     }
 
     func extractCurrentArchive() {
-        guard let archiveURL else { return }
+        guard let archiveURL, !isBusy else { return }
         Self.prepareNotificationsForOperation()
         let password = archivePassword
         let cancellation = beginOperation(title: L10n.tr("operation.extracting"), detail: archiveURL.lastPathComponent)
@@ -805,7 +746,7 @@ final class AppState: ObservableObject {
     }
 
     func testCurrentArchive() {
-        guard let archiveURL else { return }
+        guard let archiveURL, !isBusy else { return }
         let password = archivePassword
         let cancellation = beginOperation(title: L10n.tr("status.testing"), detail: archiveURL.lastPathComponent, fraction: nil)
         Task { @MainActor [weak self] in
@@ -838,7 +779,7 @@ final class AppState: ObservableObject {
             guard let type = UTType(filenameExtension: filenameExtension), seenTypeIdentifiers.insert(type.identifier).inserted else { return nil }
             return type
         }
-        if panel.runModal() == .OK, let url = panel.url { handle(urls: [url]) }
+        presentOpenPanel(panel) { [weak self] urls in self?.handle(urls: urls) }
     }
 
     func openItemsPanel(append: Bool = false) {
@@ -846,7 +787,22 @@ final class AppState: ObservableObject {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        if panel.runModal() == .OK { append ? appendItems(panel.urls) : handle(urls: panel.urls) }
+        presentOpenPanel(panel) { [weak self] urls in
+            guard let self else { return }
+            append ? self.appendItems(urls) : self.handle(urls: urls)
+        }
+    }
+
+    private func presentOpenPanel(_ panel: NSOpenPanel, completion: @escaping @MainActor ([URL]) -> Void) {
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            panel.orderOut(nil)
+            if response == .OK { completion(panel.urls) }
+        }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            panel.begin(completionHandler: finish)
+        }
     }
 
     var isSplitConfigurationValid: Bool {
@@ -1052,6 +1008,7 @@ final class AppState: ObservableObject {
 @MainActor
 enum FinderTableBehavior {
     static func configure(_ table: NSTableView, allowsMultipleSelection: Bool, autosaveName: String) {
+        let nameColumn = table.tableColumns.first
         table.usesAlternatingRowBackgroundColors = true
         table.allowsColumnReordering = true
         table.allowsColumnResizing = true
@@ -1059,10 +1016,25 @@ enum FinderTableBehavior {
         table.allowsMultipleSelection = allowsMultipleSelection
         table.rowHeight = 26
         table.headerView = NSTableHeaderView()
-        table.columnAutoresizingStyle = .reverseSequentialColumnAutoresizingStyle
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        // Restore only after all columns and their constraints exist.
         table.autosaveName = autosaveName
         table.autosaveTableColumns = true
+        // Saved layouts can predate the name-column locking policy.
+        if let nameColumn, let index = table.tableColumns.firstIndex(of: nameColumn), index != 0 {
+            table.moveColumn(index, toColumn: 0)
+        }
         table.backgroundColor = .clear
+    }
+
+    static func makeColumn(identifier: String, title: String, width: CGFloat, minimumWidth: CGFloat, isFlexible: Bool) -> NSTableColumn {
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+        column.title = title
+        column.minWidth = minimumWidth
+        column.maxWidth = .greatestFiniteMagnitude
+        column.width = width
+        column.resizingMask = resizingMask(isFlexibleColumn: isFlexible)
+        return column
     }
 
     static func resizingMask(isFlexibleColumn: Bool) -> NSTableColumn.ResizingOptions {
@@ -1081,7 +1053,7 @@ enum FinderTableBehavior {
 
         // AppKit first proposes -1 when a header drag begins. Other columns may
         // start dragging, but index 0 remains reserved for the name column.
-        return newColumnIndex == -1 || newColumnIndex > 0
+        return newColumnIndex == -1 || (newColumnIndex > 0 && tableView.tableColumns.indices.contains(newColumnIndex))
     }
 }
 
@@ -1479,27 +1451,22 @@ struct ArchiveEntriesTable: NSViewRepresentable {
         Coordinator(entries: entries, contentRevision: contentRevision, filter: filter)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    static func makeTable(autosaveName: String = "local.codex.cleanzip.archiveEntriesTable.v13") -> NSTableView {
         let table = NSTableView()
-        FinderTableBehavior.configure(
-            table,
-            allowsMultipleSelection: false,
-            autosaveName: "local.codex.cleanzip.archiveEntriesTable.v13"
-        )
-        let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("name", L10n.tr("column.name"), 360, 180, .greatestFiniteMagnitude),
-            ("size", L10n.tr("column.size"), 140, 96, 280),
-            ("modified", L10n.tr("column.modified"), 240, 190, 2000)
+        let columns: [(String, String, CGFloat, CGFloat)] = [
+            ("name", L10n.tr("column.name"), 360, 180),
+            ("size", L10n.tr("column.size"), 140, 96),
+            ("modified", L10n.tr("column.modified"), 240, 190)
         ]
         for spec in columns {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.0))
-            column.title = spec.1
-            column.width = spec.2
-            column.minWidth = spec.3
-            column.maxWidth = spec.4
-            column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: spec.0 == "name")
-            table.addTableColumn(column)
+            table.addTableColumn(FinderTableBehavior.makeColumn(identifier: spec.0, title: spec.1, width: spec.2, minimumWidth: spec.3, isFlexible: spec.0 == "name"))
         }
+        FinderTableBehavior.configure(table, allowsMultipleSelection: false, autosaveName: autosaveName)
+        return table
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let table = Self.makeTable()
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
         let scroll = NSScrollView()
@@ -1676,29 +1643,23 @@ struct SelectedItemsTable: NSViewRepresentable {
         Coordinator(items: items, contentRevision: contentRevision, selectedIDs: $selectedIDs)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    static func makeTable(autosaveName: String = "local.codex.cleanzip.selectedItemsTable.v13") -> NSTableView {
         let table = NSTableView()
-        FinderTableBehavior.configure(
-            table,
-            allowsMultipleSelection: true,
-            autosaveName: "local.codex.cleanzip.selectedItemsTable.v13"
-        )
-
-        let columns: [(String, String, CGFloat, CGFloat, CGFloat)] = [
-            ("selectedName", L10n.tr("column.name"), 230, 180, .greatestFiniteMagnitude),
-            ("selectedType", L10n.tr("column.type"), 80, 70, 160),
-            ("selectedSize", L10n.tr("column.size"), 100, 90, 220),
-            ("selectedLocation", L10n.tr("column.location"), 330, 220, 2000)
+        let columns: [(String, String, CGFloat, CGFloat)] = [
+            ("selectedName", L10n.tr("column.name"), 230, 180),
+            ("selectedType", L10n.tr("column.type"), 80, 70),
+            ("selectedSize", L10n.tr("column.size"), 100, 90),
+            ("selectedLocation", L10n.tr("column.location"), 330, 220)
         ]
         for spec in columns {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.0))
-            column.title = spec.1
-            column.width = spec.2
-            column.minWidth = spec.3
-            column.maxWidth = spec.4
-            column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: spec.0 == "selectedName")
-            table.addTableColumn(column)
+            table.addTableColumn(FinderTableBehavior.makeColumn(identifier: spec.0, title: spec.1, width: spec.2, minimumWidth: spec.3, isFlexible: spec.0 == "selectedName"))
         }
+        FinderTableBehavior.configure(table, allowsMultipleSelection: true, autosaveName: autosaveName)
+        return table
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let table = Self.makeTable()
         table.delegate = context.coordinator
         table.dataSource = context.coordinator
 
@@ -2607,11 +2568,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
         let center = UNUserNotificationCenter.current()
         center.delegate = self
     }
-    private func pasteboardURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty { return urls }
-        if let filenames = pasteboard.propertyList(forType: .fileURL) as? [String] { return filenames.map { URL(fileURLWithPath: $0) } }
-        if let filenames = pasteboard.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] { return filenames.map { URL(fileURLWithPath: $0) } }
-        return []
+    func pasteboardURLs(_ pasteboard: NSPasteboard) -> [URL] {
+        pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
 }
 

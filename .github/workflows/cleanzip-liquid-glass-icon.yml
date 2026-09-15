@@ -6,7 +6,7 @@ on:
       release_tag:
         description: "Release tag to update"
         required: true
-        default: "v2.6.35"
+        default: "v2.6.36"
       upload_release:
         description: "Upload pkg, zip, and checksums to the release"
         required: true
@@ -22,6 +22,7 @@ on:
       - "work/CleanZipBuild/Assets.xcassets/**"
       - "work/CleanZipBuild/src/main.swift"
       - "work/CleanZipBuild/src/service.swift"
+      - "work/CleanZipBuild/src/ArchiveFileSafety.swift"
       - "work/CleanZipBuild/src/build.sh"
       - "work/CleanZipBuild/src/build_xcode.sh"
       - "work/CleanZipBuild/src/package.sh"
@@ -50,13 +51,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xcode="$(find /Applications -maxdepth 1 -name 'Xcode*.app' -print | sort | tail -n 1)"
+          xcode="$(python3 - <<'PY'
+          import glob
+          import plistlib
+          from pathlib import Path
+
+          candidates = []
+          for path in glob.glob('/Applications/Xcode*.app'):
+              with (Path(path) / 'Contents/Info.plist').open('rb') as source:
+                  version = plistlib.load(source).get('CFBundleShortVersionString', '')
+              parts = version.split('.')
+              if parts[0] == '26' and all(part.isdigit() for part in parts) and 'beta' not in path.lower():
+                  candidates.append((tuple(map(int, parts)), path))
+          if candidates:
+              print(max(candidates)[1])
+          PY
+          )"
           if [[ -z "$xcode" ]]; then
-            echo "No Xcode app was found on this runner." >&2
+            echo "No stable Xcode 26 installation was found on this runner." >&2
             exit 2
           fi
           sudo xcode-select -s "$xcode/Contents/Developer"
           xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
           xcrun --find actool
           xcrun --find assetutil
           xcrun --find ictool || true
@@ -260,8 +277,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pkg="$(find work/CleanZipBuild/dist -maxdepth 1 -name 'CleanZip-*.pkg' -print | sort | tail -n 1)"
-          zip="$(find work/CleanZipBuild/dist -maxdepth 1 -name 'CleanZip-*.zip' -print | sort | tail -n 1)"
+          pkg="work/CleanZipBuild/dist/CleanZip-${RELEASE_TAG#v}.pkg"
+          zip="work/CleanZipBuild/dist/CleanZip-${RELEASE_TAG#v}.zip"
           sums="work/CleanZipBuild/dist/SHA256SUMS.txt"
           test -f "$pkg"
           test -f "$zip"
