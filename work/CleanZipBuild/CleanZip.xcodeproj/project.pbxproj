@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F03600000000000000000002 /* ArchiveFileSafety.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03600000000000000000001 /* ArchiveFileSafety.swift */; };
+		F03600000000000000000003 /* ArchiveFileSafety.swift in Sources */ = {isa = PBXBuildFile; fileRef = F03600000000000000000001 /* ArchiveFileSafety.swift */; };
 		0761278721877752C7D07C8B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 174049453FBF1D651378DD77 /* Cocoa.framework */; };
 		0BD2C4DE9E402385698C783B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */; };
 		0FC4B6ED47B560EAA5CC7142 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DB1D68FB66D3B80B045BEF1D /* Assets.xcassets */; };
@@ -18,9 +20,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F03600000000000000000001 /* ArchiveFileSafety.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveFileSafety.swift; sourceTree = "<group>"; };
 		012CF8C36EBB5EB34C2CA5F5 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		0D49D37CFF6FD797B7E67E40 /* CleanZipService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "CleanZipService-Info.plist"; sourceTree = "<group>"; };
-		174049453FBF1D651378DD77 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		174049453FBF1D651378DD77 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		1E7D8EA060624BC697B215CD /* 7-Zip-License.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-License.txt"; sourceTree = "<group>"; };
 		2D6DF54690D5ABB1CF590960 /* CleanZipService.service */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = CleanZipService.service; path = CleanZipService.service; sourceTree = BUILT_PRODUCTS_DIR; };
 		5402186A9FA7F5973A47C7EA /* 7-Zip-readme.txt */ = {isa = PBXFileReference; includeInIndex = 1; path = "7-Zip-readme.txt"; sourceTree = "<group>"; };
@@ -60,6 +63,7 @@
 				5F19354BDF3CE3E4B5BC50D8 /* Resources */,
 				AEFFEFF84818CF85AEEB45D5 /* main.swift */,
 				CEBE149A835D3B3343344720 /* service.swift */,
+				F03600000000000000000001 /* ArchiveFileSafety.swift */,
 				F6CA192D42B61691A4B05B03 /* CleanZip-Info.plist */,
 				0D49D37CFF6FD797B7E67E40 /* CleanZipService-Info.plist */,
 			);
@@ -259,6 +263,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AC04038C3012111273B1D09F /* service.swift in Sources */,
+				F03600000000000000000003 /* ArchiveFileSafety.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +272,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D7AFCD49BF3A030278A4AA01 /* main.swift in Sources */,
+				F03600000000000000000002 /* ArchiveFileSafety.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

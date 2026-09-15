@@ -6,13 +6,15 @@ import SwiftUI
 struct TableBehaviorTests {
     private static var failures: [String] = []
 
-    static func main() {
+    static func main() async {
         _ = NSApplication.shared
         testMainMenuConfiguration()
         testNativeTableConfiguration()
         testArchiveColumnReorderingPolicy()
         testSelectedItemsColumnReorderingPolicy()
         testNativeColumnSizing()
+        testProductionColumnBoundaries()
+        testSavedColumnRestoration()
         testSelectedItemMetadataSnapshot()
         testProgressPublishingIsDeduplicated()
         testStaleOperationCallbacksAreIgnored()
@@ -21,6 +23,7 @@ struct TableBehaviorTests {
         testArchiveEngineRoundTrips()
         testEncryptedArchivePasswordFlow()
         testPreCancelledOperationDoesNotCreateOutput()
+        failures += await ArchiveSafetyTests.run()
 
         if failures.isEmpty {
             print("PASS: CleanZip table behavior tests")
@@ -61,7 +64,7 @@ struct TableBehaviorTests {
         expect(table.allowsColumnResizing, "column resizing should be enabled")
         expect(!table.allowsColumnSelection, "column headers must never become selected")
         expect(table.allowsMultipleSelection, "selected-items rows should allow multiple selection")
-        expect(table.columnAutoresizingStyle == .reverseSequentialColumnAutoresizingStyle, "window resizing should use AppKit's reverse sequential policy")
+        expect(table.columnAutoresizingStyle == .firstColumnOnlyAutoresizingStyle, "window resizing should use AppKit's first-column-only policy")
 
         let flexibleMask = FinderTableBehavior.resizingMask(isFlexibleColumn: true)
         let fixedMask = FinderTableBehavior.resizingMask(isFlexibleColumn: false)
@@ -116,7 +119,7 @@ struct TableBehaviorTests {
             column.maxWidth = sizing.2
             column.resizingMask = FinderTableBehavior.resizingMask(isFlexibleColumn: index == 0)
         }
-        table.columnAutoresizingStyle = .reverseSequentialColumnAutoresizingStyle
+        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         scroll.documentView = table
         scroll.layoutSubtreeIfNeeded()
 
@@ -142,6 +145,66 @@ struct TableBehaviorTests {
         expect(approximately(firstColumn.width, firstColumn.minWidth), "the first column must respect its minimum width")
         expect(columnsWidth(table) > scroll.contentView.bounds.width + 1, "columns should overflow only when their native minimum widths cannot fit")
         expect(canScrollHorizontally(scroll), "minimum-width overflow should use the standard horizontal scroller")
+    }
+
+    private static func testProductionColumnBoundaries() {
+        let tables = [
+            ArchiveEntriesTable.makeTable(autosaveName: "cleanzip.tests." + UUID().uuidString),
+            SelectedItemsTable.makeTable(autosaveName: "cleanzip.tests." + UUID().uuidString)
+        ]
+        for table in tables {
+            let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 1_000, height: 400))
+            scroll.hasHorizontalScroller = true
+            scroll.hasVerticalScroller = true
+            scroll.autohidesScrollers = true
+            scroll.documentView = table
+            scroll.layoutSubtreeIfNeeded()
+            let name = table.tableColumns[0]
+            let trailing = Array(table.tableColumns.dropFirst())
+            for column in trailing {
+                let oldWidths = table.tableColumns.map(\.width)
+                column.width = 2_400
+                scroll.layoutSubtreeIfNeeded()
+                expect(approximately(column.width, 2_400), "\(column.identifier) must not stop at a small hard-coded maximum")
+                for (other, oldWidth) in zip(table.tableColumns, oldWidths) where other !== column {
+                    expect(approximately(other.width, oldWidth), "resizing \(column.identifier) must not resize its neighbors")
+                }
+                column.width = column.minWidth
+            }
+            table.moveColumn(table.numberOfColumns - 1, toColumn: 1)
+            let trailingWidths = trailing.map(\.width)
+            for width: CGFloat in [640, 1_600, 480, 2_000, 800] {
+                scroll.setFrameSize(NSSize(width: width, height: 400))
+                scroll.layoutSubtreeIfNeeded()
+                expect(name.width >= name.minWidth, "name column went below its minimum")
+                for (column, expected) in zip(trailing, trailingWidths) {
+                    expect(approximately(column.width, expected), "window resizing changed a non-name column after reordering")
+                }
+                if width >= 800 { expect(!canScrollHorizontally(scroll), "wide viewport should absorb minimum-width overflow") }
+            }
+            expect(!FinderTableBehavior.shouldReorderColumn(in: table, columnIndex: 1, newColumnIndex: table.numberOfColumns, lockedIdentifier: name.identifier.rawValue), "out-of-range column drop must be rejected")
+            expect(!FinderTableBehavior.shouldReorderColumn(in: table, columnIndex: 1, newColumnIndex: -2, lockedIdentifier: name.identifier.rawValue), "invalid negative column drop must be rejected")
+            table.autosaveTableColumns = false
+        }
+    }
+
+    private static func testSavedColumnRestoration() {
+        let autosaveName = "cleanzip.tests.restore." + UUID().uuidString
+        let table = SelectedItemsTable.makeTable(autosaveName: autosaveName)
+        table.tableColumns[1].width = 425
+        table.moveColumn(3, toColumn: 1)
+        let identifiers = table.tableColumns.map(\.identifier)
+        let restored = SelectedItemsTable.makeTable(autosaveName: autosaveName)
+        expect(restored.tableColumns.map(\.identifier) == identifiers, "all columns must exist before AppKit restores their order")
+        expect(approximately(restored.tableColumn(withIdentifier: .init("selectedType"))!.width, 425), "saved column width must survive table reconstruction")
+        restored.autosaveTableColumns = false
+        // Simulate a layout saved before the name-column locking policy existed.
+        table.moveColumn(0, toColumn: 2)
+        let repaired = SelectedItemsTable.makeTable(autosaveName: autosaveName)
+        expect(repaired.tableColumns[0].identifier.rawValue == "selectedName", "restoring a legacy layout must not displace the locked name column")
+        expect(repaired.tableColumns.dropFirst().map(\.identifier) == identifiers.dropFirst().map { $0 }, "repair should preserve the user's remaining column order")
+        table.autosaveTableColumns = false
+        repaired.autosaveTableColumns = false
     }
 
     private static func testSelectedItemMetadataSnapshot() {
@@ -250,7 +313,8 @@ struct TableBehaviorTests {
     private static func testSplitArchiveFormat(_ format: ArchiveFormat, in directory: URL) throws {
         let payload = try makePayload(in: directory)
         let archive = try ArchiveEngine.shared.compress(urls: [payload], format: format, splitSpec: "1k")
-        let firstVolume = URL(fileURLWithPath: archive.path + ".001")
+        let firstVolume = archive
+        expect(firstVolume.pathExtension == "001", "split compression should return the first volume, not a nonexistent base path")
         expect(FileManager.default.fileExists(atPath: firstVolume.path), "split \(format.rawValue) should create a .001 volume")
         try ArchiveEngine.shared.testArchive(firstVolume)
         let entries = try ArchiveEngine.shared.listArchive(firstVolume)

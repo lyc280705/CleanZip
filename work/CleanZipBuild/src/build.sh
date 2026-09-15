@@ -7,6 +7,7 @@ SERVICE="$ROOT/CleanZipService.service"
 RESOURCES="$ROOT/src/Resources"
 DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 ARCHS="${CLEANZIP_ARCHS:-arm64 x86_64}"
+SDK="${CLEANZIP_SDK:-$(xcrun --sdk macosx --show-sdk-path)}"
 BUILD_DIR="$ROOT/build"
 
 export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
@@ -31,20 +32,22 @@ for arch in $ARCHS; do
   service_slice="$BUILD_DIR/CleanZipService.${arch}"
 
   xcrun swiftc -O -parse-as-library -swift-version 6 -strict-concurrency=complete -warn-concurrency \
-    -target "$target" \
+    -target "$target" -sdk "$SDK" \
     -framework AppKit \
     -framework SwiftUI \
     -framework Combine \
     -framework UniformTypeIdentifiers \
     -framework UserNotifications \
     "$ROOT/src/main.swift" \
+    "$ROOT/src/ArchiveFileSafety.swift" \
     -o "$app_slice"
 
   xcrun swiftc -O -parse-as-library -swift-version 6 -strict-concurrency=complete -warn-concurrency \
-    -target "$target" \
+    -target "$target" -sdk "$SDK" \
     -framework AppKit \
     -framework UserNotifications \
     "$ROOT/src/service.swift" \
+    "$ROOT/src/ArchiveFileSafety.swift" \
     -o "$service_slice"
 
   app_slices+=("$app_slice")

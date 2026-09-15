@@ -33,14 +33,14 @@ The workflow imports certificates into an ephemeral runner keychain. It never wr
 
 ## Publish
 
-Create the tag and release first, then dispatch the workflow so its artifacts replace the release assets:
+Create the tag and a draft release at the tested commit first, then dispatch the workflow from that tag so the package matches the release source:
 
 ```sh
 gh workflow run cleanzip-liquid-glass-icon.yml \
   --repo lyc280705/CleanZip \
-  --ref main \
-  -f release_tag=v2.6.35 \
+  --ref v2.6.36 \
+  -f release_tag=v2.6.36 \
   -f upload_release=true
 ```
 
-Check the workflow summary before announcing the release. A public build should only be described as notarized when the summary reports `developer-id` and `1` for the signing and notarization fields.
+Before publishing the draft, download both assets, verify `SHA256SUMS.txt`, and inspect their bundle versions, architecture slices, and PKG install paths. Check the workflow summary before announcing the release. A public build should only be described as notarized when the summary reports `developer-id` and `1` for the signing and notarization fields.

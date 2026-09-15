@@ -106,6 +106,11 @@ final class ArchiveEngine: @unchecked Sendable {
     private let fileManager = FileManager.default
 
     var sevenZipURL: URL? {
+#if CLEANZIP_TESTING
+        if let path = ProcessInfo.processInfo.environment["CLEANZIP_7ZZ_PATH"], fileManager.isExecutableFile(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+#endif
         if let bundled = Bundle.main.url(forResource: "7zz", withExtension: nil),
            fileManager.isExecutableFile(atPath: bundled.path) {
             return bundled
@@ -114,6 +119,7 @@ final class ArchiveEngine: @unchecked Sendable {
     }
 
     func isArchive(_ url: URL) -> Bool {
+        guard ArchiveFileSafety.isRegularArchiveCandidate(url) else { return false }
         let name = url.lastPathComponent.lowercased()
         let extensions = [
             ".zip", ".7z", ".rar", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tbz2",
@@ -133,44 +139,60 @@ final class ArchiveEngine: @unchecked Sendable {
             throw ArchiveError.failed(L10n.tr("error.sameParentRequired"))
         }
         let baseName = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
-        let output = uniqueFileURL(in: parent, baseName: baseName, extensionName: "zip")
+        try cancellation?.checkCancellation()
+        let workspace = try ArchiveWorkspace(in: parent)
+        let output = workspace.directory.appendingPathComponent(baseName + ".zip")
         let itemNames = urls.map { itemNameForProcess($0) }
-        do {
-            try compressWith7z(parent: parent, output: output, itemNames: itemNames, cancellation: cancellation, progressHandler: progressHandler)
-            return output
-        } catch {
-            removePartialArchive(at: output)
-            throw error
+        try compressWith7z(parent: parent, output: output, itemNames: itemNames, cancellation: cancellation, progressHandler: progressHandler)
+        return try workspace.publishArchive(output, baseName: baseName, extensionName: "zip", split: false) {
+            try cancellation?.checkCancellation()
         }
     }
 
     func extract(archive: URL, cancellation: OperationCancellation? = nil, progressHandler: ProgressHandler? = nil) throws -> URL {
         let parent = archive.deletingLastPathComponent()
         let baseName = archiveBaseName(archive)
-        let outputDir = uniqueDirectoryURL(in: parent, baseName: baseName)
-        try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
-        do {
-            return try extractWith7z(archive: archive, outputDir: outputDir, cancellation: cancellation, progressHandler: progressHandler)
-        } catch {
-            try? fileManager.removeItem(at: outputDir)
-            throw error
+        try cancellation?.checkCancellation()
+        let workspace = try ArchiveWorkspace(in: parent)
+        let outputDir = try workspace.makeDirectory("content")
+        if ArchiveFileSafety.isCompressedTar(archive) {
+            let outerDir = try workspace.makeDirectory("outer")
+            _ = try extractWith7z(archive: archive, outputDir: outerDir, cancellation: cancellation, progressHandler: nil)
+            let contents = try fileManager.contentsOfDirectory(at: outerDir, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard contents.count == 1,
+                  try contents[0].resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true,
+                  try contents[0].resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                throw ArchiveError.failed(L10n.tr("error.unknownArchiveFailure"))
+            }
+            _ = try extractWith7z(archive: contents[0], outputDir: outputDir, cancellation: cancellation, progressHandler: progressHandler, archiveType: "tar")
+        } else {
+            _ = try extractWith7z(archive: archive, outputDir: outputDir, cancellation: cancellation, progressHandler: progressHandler)
+        }
+        try ArchiveFileSafety.propagateQuarantine(from: archive, to: outputDir) {
+            try cancellation?.checkCancellation()
+        }
+        return try workspace.publishDirectory(outputDir, baseName: baseName) {
+            try cancellation?.checkCancellation()
         }
     }
 
     private func compressWith7z(parent: URL, output: URL, itemNames: [String], cancellation: OperationCancellation?, progressHandler: ProgressHandler?) throws {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        var args = ["a", "-tzip", "-mx=5", "-y", "-bsp1", output.path]
+        var args = ["a", "-tzip", "-mx=5", "-y", "-bsp1", "-spd", "-xr!.DS_Store", "-xr!__MACOSX", "-xrw!._*", "--", output.path]
         args.append(contentsOf: itemNames)
-        args.append(contentsOf: ["-xr!.DS_Store", "-xr!__MACOSX", "-xr!._*"])
         var env = ProcessInfo.processInfo.environment
         env["COPYFILE_DISABLE"] = "1"
         let result = try runProcess(executable: sevenZipURL, arguments: args, currentDirectory: parent, environment: env, cancellation: cancellation, progressHandler: progressHandler)
         guard result.status == 0 else { throw archiveError(for: result) }
     }
 
-    private func extractWith7z(archive: URL, outputDir: URL, cancellation: OperationCancellation?, progressHandler: ProgressHandler?) throws -> URL {
+    private func extractWith7z(archive: URL, outputDir: URL, cancellation: OperationCancellation?, progressHandler: ProgressHandler?, archiveType: String? = nil) throws -> URL {
         guard let sevenZipURL else { throw ArchiveError.missingTool("7zz") }
-        let result = try runProcess(executable: sevenZipURL, arguments: ["x", "-y", "-bsp1", "-o\(outputDir.path)", archive.path], cancellation: cancellation, progressHandler: progressHandler)
+        var args = ["x", "-y", "-spd", "-o\(outputDir.path)"]
+        if progressHandler != nil { args.append("-bsp1") }
+        if let archiveType { args.append("-t\(archiveType)") }
+        args.append(contentsOf: ["--", archive.path])
+        let result = try runProcess(executable: sevenZipURL, arguments: args, cancellation: cancellation, progressHandler: progressHandler)
         guard result.status == 0 else { throw archiveError(for: result) }
         return outputDir
     }
@@ -189,6 +211,9 @@ final class ArchiveEngine: @unchecked Sendable {
         process.standardInput = FileHandle.nullDevice
         let stdoutBuffer = DataBuffer()
         let stderrBuffer = DataBuffer()
+        try process.run()
+        cancellation?.register(process)
+        defer { cancellation?.unregister(process) }
         let readers = DispatchGroup()
         readers.enter()
         DispatchQueue.global(qos: .utility).async {
@@ -200,9 +225,6 @@ final class ArchiveEngine: @unchecked Sendable {
             self.readPipe(stderrPipe, into: stderrBuffer, progressHandler: progressHandler)
             readers.leave()
         }
-        try process.run()
-        cancellation?.register(process)
-        defer { cancellation?.unregister(process) }
         process.waitUntilExit()
         readers.wait()
         try cancellation?.checkCancellation()
@@ -217,21 +239,6 @@ final class ArchiveEngine: @unchecked Sendable {
             return .passwordRequired
         }
         return .failed(message.isEmpty ? L10n.tr("error.unknownArchiveFailure") : message)
-    }
-
-    private func removePartialArchive(at output: URL) {
-        try? fileManager.removeItem(at: output)
-        let directory = output.deletingLastPathComponent()
-        let volumePrefix = output.lastPathComponent + "."
-        guard let candidates = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
-        for candidate in candidates {
-            let name = candidate.lastPathComponent
-            guard name.hasPrefix(volumePrefix) else { continue }
-            let suffix = name.dropFirst(volumePrefix.count)
-            if suffix.count == 3, suffix.allSatisfy(\.isNumber) {
-                try? fileManager.removeItem(at: candidate)
-            }
-        }
     }
 
     private func readPipe(_ pipe: Pipe, into buffer: DataBuffer, progressHandler: ProgressHandler?) {
@@ -257,8 +264,7 @@ final class ArchiveEngine: @unchecked Sendable {
     }
 
     private func itemNameForProcess(_ url: URL) -> String {
-        let name = url.lastPathComponent
-        return name.hasPrefix("-") ? "./\(name)" : name
+        "./" + url.lastPathComponent
     }
 
     private func archiveBaseName(_ url: URL) -> String {
@@ -271,25 +277,6 @@ final class ArchiveEngine: @unchecked Sendable {
         return url.deletingPathExtension().lastPathComponent
     }
 
-    private func uniqueFileURL(in directory: URL, baseName: String, extensionName: String) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(extensionName)")
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName) \(index).\(extensionName)")
-            index += 1
-        }
-        return candidate
-    }
-
-    private func uniqueDirectoryURL(in directory: URL, baseName: String) -> URL {
-        var candidate = directory.appendingPathComponent(baseName)
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName) \(index)")
-            index += 1
-        }
-        return candidate
-    }
 }
 
 @MainActor
@@ -658,20 +645,12 @@ final class ServiceDelegate: NSObject, NSApplicationDelegate, UNUserNotification
         }
     }
 
-    private func pasteboardURLs(_ pasteboard: NSPasteboard) -> [URL] {
-        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            return urls
-        }
-        if let filenames = pasteboard.propertyList(forType: .fileURL) as? [String] {
-            return filenames.map { URL(fileURLWithPath: $0) }
-        }
-        if let filenames = pasteboard.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] {
-            return filenames.map { URL(fileURLWithPath: $0) }
-        }
-        return []
+    func pasteboardURLs(_ pasteboard: NSPasteboard) -> [URL] {
+        pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
 }
 
+#if !CLEANZIP_TESTING
 @main
 @MainActor
 struct CleanZipServiceMain {
@@ -683,3 +662,4 @@ struct CleanZipServiceMain {
         app.run()
     }
 }
+#endif
