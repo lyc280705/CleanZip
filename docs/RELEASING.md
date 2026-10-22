@@ -38,8 +38,8 @@ Create the tag and a draft release at the tested commit first, then dispatch the
 ```sh
 gh workflow run cleanzip-liquid-glass-icon.yml \
   --repo lyc280705/CleanZip \
-  --ref v2.6.36 \
-  -f release_tag=v2.6.36 \
+  --ref v2.6.37 \
+  -f release_tag=v2.6.37 \
   -f upload_release=true
 ```
 

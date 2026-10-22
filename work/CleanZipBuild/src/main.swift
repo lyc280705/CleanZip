@@ -2145,9 +2145,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func application(_ application: NSApplication, open urls: [URL]) {
         openedFromFile = true
-        showWindow()
+        // Build the initial toolbar for the file's mode, not a transient empty window.
         AppState.shared.handle(urls: urls)
-        refreshToolbar()
+        showWindow()
     }
 
     @objc(cleanZip:userData:error:)
@@ -2213,8 +2213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTo
                 DispatchQueue.main.async {
                     self.serviceCancellation = nil
                     self.serviceProgressHUD.finish()
-                    self.showWindow()
                     AppState.shared.handle(urls: [url])
+                    self.showWindow()
                 }
             } catch ArchiveError.cancelled {
                 DispatchQueue.main.async {

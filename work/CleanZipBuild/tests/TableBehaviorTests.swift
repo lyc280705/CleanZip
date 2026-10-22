@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -9,6 +10,7 @@ struct TableBehaviorTests {
     static func main() async {
         _ = NSApplication.shared
         testMainMenuConfiguration()
+        testFileOpenInitialToolbarState()
         testNativeTableConfiguration()
         testArchiveColumnReorderingPolicy()
         testSelectedItemsColumnReorderingPolicy()
@@ -70,6 +72,58 @@ struct TableBehaviorTests {
         let fixedMask = FinderTableBehavior.resizingMask(isFlexibleColumn: false)
         expect(flexibleMask.contains(.userResizingMask) && flexibleMask.contains(.autoresizingMask), "the name column should support user and window resizing")
         expect(fixedMask.contains(.userResizingMask) && !fixedMask.contains(.autoresizingMask), "later columns should resize only when their divider is dragged")
+    }
+
+    private static func testFileOpenInitialToolbarState() {
+        let state = AppState.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cleanzip-toolbar-tests-\(UUID().uuidString)")
+        defer {
+            state.handle(urls: [root])
+            state.clearSelectedItems()
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let source = root.appendingPathComponent("toolbar.txt")
+            try Data("toolbar regression".utf8).write(to: source)
+            let archive = try ArchiveEngine.shared.compress(urls: [source], format: .zip, splitSpec: nil)
+            let existingWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
+            var inputWasSetBeforeWindowCreation = false
+            let observer = state.$archiveURL.dropFirst().sink { url in
+                guard url == archive else { return }
+                inputWasSetBeforeWindowCreation = NSApp.windows.allSatisfy { existingWindows.contains(ObjectIdentifier($0)) }
+            }
+
+            let delegate = AppDelegate()
+            delegate.application(NSApp, open: [archive])
+            observer.cancel()
+            guard let window = NSApp.windows.first(where: { !existingWindows.contains(ObjectIdentifier($0)) }),
+                  let toolbar = window.toolbar else {
+                failures.append("opening an archive should create a window with a native toolbar")
+                return
+            }
+            defer { window.close() }
+
+            expect(inputWasSetBeforeWindowCreation, "file-open launch must set archive state before creating the toolbar; hiding then immediately revealing items can lose their labels")
+            expect(toolbar.displayMode == .iconAndLabel, "file-open launch should retain icon-and-label mode")
+            func visibleActionNames() -> [String] {
+                toolbar.items.filter { item in
+                    if #available(macOS 15.0, *) { return !item.isHidden }
+                    return true
+                }.filter { $0.action != nil }.map { $0.itemIdentifier.rawValue.components(separatedBy: ".").last! }
+            }
+            expect(visibleActionNames() == ["compactSearch", "testArchive", "chooseArchive", "chooseItems", "extractArchive"], "cold archive launch should show the archive actions")
+            expect(toolbar.items.filter { $0.action != nil }.allSatisfy { !$0.label.isEmpty }, "native toolbar actions must have labels")
+
+            delegate.application(NSApp, open: [source])
+            expect(window.toolbar === toolbar, "opening another input should reuse the window toolbar")
+            expect(visibleActionNames() == ["addItems", "removeItems", "clearItems", "chooseArchive", "chooseItems", "compressSettings"], "opening a regular file should switch to compression actions")
+            delegate.application(NSApp, open: [archive])
+            expect(visibleActionNames() == ["compactSearch", "testArchive", "chooseArchive", "chooseItems", "extractArchive"], "returning to an archive should restore archive actions")
+        } catch {
+            failures.append("file-open toolbar regression failed: \(error.localizedDescription)")
+        }
     }
 
     private static func testArchiveColumnReorderingPolicy() {
